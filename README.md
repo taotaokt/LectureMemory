@@ -73,7 +73,7 @@ Planned core stack:
 - [x] Course persistence
 - [x] Lecture persistence and Course–Lecture relationships
 - [x] Note persistence with optional slide-page references
-- [ ] Slide-page persistence
+- [x] Slide-page persistence and validated note-page relationships
 - [x] PDF page rendering
 - [ ] PDF ingestion pipeline
 - [ ] Text extraction

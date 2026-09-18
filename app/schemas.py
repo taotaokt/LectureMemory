@@ -55,6 +55,29 @@ class LectureRead(BaseModel):
     updated_at: datetime
 
 
+class SlidePageCreate(BaseModel):
+    """Validated metadata for one rendered lecture page."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    page_number: int = Field(gt=0)
+    image_path: str = Field(min_length=1)
+    text_content: str | None = None
+
+
+class SlidePageRead(BaseModel):
+    """Serializable representation of a rendered slide page."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    lecture_id: int
+    page_number: int
+    image_path: str
+    text_content: str | None
+    created_at: datetime
+
+
 class NoteCreate(BaseModel):
     """Validated input for creating a note within a lecture."""
 

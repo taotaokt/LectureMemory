@@ -2,7 +2,7 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -70,6 +70,11 @@ class Lecture(Base):
         nullable=False,
     )
     course: Mapped[Course] = relationship(back_populates="lectures")
+    slide_pages: Mapped[list["SlidePage"]] = relationship(
+        back_populates="lecture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     notes: Mapped[list["Note"]] = relationship(
         back_populates="lecture",
         cascade="all, delete-orphan",
@@ -80,6 +85,41 @@ class Lecture(Base):
         return (
             f"Lecture(id={self.id!r}, course_id={self.course_id!r}, "
             f"lecture_number={self.lecture_number!r}, title={self.title!r})"
+        )
+
+
+class SlidePage(Base):
+    """A rendered page belonging to a lecture PDF."""
+
+    __tablename__ = "slide_pages"
+    __table_args__ = (
+        UniqueConstraint("lecture_id", "page_number", name="uq_slide_page_lecture_number"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lecture_id: Mapped[int] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    page_number: Mapped[int] = mapped_column(nullable=False)
+    image_path: Mapped[str] = mapped_column(Text, nullable=False)
+    text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    lecture: Mapped[Lecture] = relationship(back_populates="slide_pages")
+    notes: Mapped[list["Note"]] = relationship(
+        back_populates="page",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"SlidePage(id={self.id!r}, lecture_id={self.lecture_id!r}, "
+            f"page_number={self.page_number!r})"
         )
 
 
@@ -94,8 +134,11 @@ class Note(Base):
         nullable=False,
         index=True,
     )
-    # SlidePage is introduced in Task 2.2; until then this stores its future ID.
-    page_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    page_id: Mapped[int | None] = mapped_column(
+        ForeignKey("slide_pages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -109,6 +152,7 @@ class Note(Base):
         nullable=False,
     )
     lecture: Mapped[Lecture] = relationship(back_populates="notes")
+    page: Mapped[SlidePage | None] = relationship(back_populates="notes")
 
     def __repr__(self) -> str:
         return f"Note(id={self.id!r}, lecture_id={self.lecture_id!r}, page_id={self.page_id!r})"

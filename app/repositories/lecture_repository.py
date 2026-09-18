@@ -4,11 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Course, Lecture
+from app.repositories.errors import CourseNotFoundError
 from app.schemas import LectureCreate
-
-
-class CourseNotFoundError(ValueError):
-    """Raised when a lecture references a course that does not exist."""
 
 
 def create_lecture(

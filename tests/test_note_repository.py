@@ -17,18 +17,22 @@ from app.repositories.course_repository import create_course
 from app.repositories.lecture_repository import create_lecture, delete_lecture
 from app.repositories.note_repository import (
     LectureNotFoundError,
+    NotePageMismatchError,
+    SlidePageNotFoundError,
     create_note,
     delete_note,
     edit_note,
     get_note,
     list_lecture_notes,
 )
+from app.repositories.slide_page_repository import create_slide_page
 from app.schemas import (
     CourseCreate,
     LectureCreate,
     NoteCreate,
     NoteRead,
     NoteUpdate,
+    SlidePageCreate,
 )
 
 
@@ -85,17 +89,25 @@ def test_create_note_with_optional_page_id(
 ) -> None:
     with session_scope(note_session_factory) as session:
         lecture_id = create_test_lecture(session)
+        page = create_slide_page(
+            session,
+            lecture_id,
+            SlidePageCreate(page_number=17, image_path="page_0017.png"),
+        )
         note = create_note(
             session,
             lecture_id,
-            NoteCreate(content="Important diagram", page_id=17),
+            NoteCreate(content="Important diagram", page_id=page.id),
         )
         note_id = note.id
+        page_id = page.id
 
     with note_session_factory() as session:
         stored_note = get_note(session, note_id)
         assert stored_note is not None
-        assert stored_note.page_id == 17
+        assert stored_note.page_id == page_id
+        assert stored_note.page is not None
+        assert stored_note.page.page_number == 17
 
 
 def test_list_lecture_notes_filters_and_orders_results(
@@ -127,10 +139,15 @@ def test_edit_note_content_and_page_association(
 ) -> None:
     with session_scope(note_session_factory) as session:
         lecture_id = create_test_lecture(session)
+        page = create_slide_page(
+            session,
+            lecture_id,
+            SlidePageCreate(page_number=4, image_path="page_0004.png"),
+        )
         note = create_note(
             session,
             lecture_id,
-            NoteCreate(content="Draft", page_id=4),
+            NoteCreate(content="Draft", page_id=page.id),
         )
         note_id = note.id
 
@@ -193,6 +210,64 @@ def test_create_note_rejects_unknown_lecture(
     with note_session_factory() as session:
         with pytest.raises(LectureNotFoundError, match="Lecture 999 does not exist"):
             create_note(session, 999, NoteCreate(content="Orphan note"))
+
+
+def test_create_note_rejects_unknown_slide_page(
+    note_session_factory: sessionmaker[Session],
+) -> None:
+    with session_scope(note_session_factory) as session:
+        lecture_id = create_test_lecture(session)
+        with pytest.raises(SlidePageNotFoundError, match="Slide page 999 does not exist"):
+            create_note(
+                session,
+                lecture_id,
+                NoteCreate(content="Missing page", page_id=999),
+            )
+
+
+def test_create_note_rejects_page_from_different_lecture(
+    note_session_factory: sessionmaker[Session],
+) -> None:
+    with session_scope(note_session_factory) as session:
+        first_lecture_id = create_test_lecture(session, 1)
+        second_lecture_id = create_test_lecture(session, 2)
+        page = create_slide_page(
+            session,
+            second_lecture_id,
+            SlidePageCreate(page_number=1, image_path="other/page_0001.png"),
+        )
+
+        with pytest.raises(NotePageMismatchError, match="belongs to lecture"):
+            create_note(
+                session,
+                first_lecture_id,
+                NoteCreate(content="Wrong lecture", page_id=page.id),
+            )
+
+
+def test_edit_note_rejects_page_from_different_lecture(
+    note_session_factory: sessionmaker[Session],
+) -> None:
+    with session_scope(note_session_factory) as session:
+        first_lecture_id = create_test_lecture(session, 1)
+        second_lecture_id = create_test_lecture(session, 2)
+        note = create_note(session, first_lecture_id, NoteCreate(content="Original"))
+        page = create_slide_page(
+            session,
+            second_lecture_id,
+            SlidePageCreate(page_number=1, image_path="other/page_0001.png"),
+        )
+        note_id = note.id
+        page_id = page.id
+
+    with note_session_factory() as session:
+        with pytest.raises(NotePageMismatchError, match="belongs to lecture"):
+            edit_note(session, note_id, NoteUpdate(page_id=page_id))
+
+    with note_session_factory() as session:
+        stored_note = get_note(session, note_id)
+        assert stored_note is not None
+        assert stored_note.page_id is None
 
 
 @pytest.mark.parametrize(

@@ -3,12 +3,13 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Lecture, Note
+from app.models import Lecture, Note, SlidePage
+from app.repositories.errors import (
+    LectureNotFoundError,
+    NotePageMismatchError,
+    SlidePageNotFoundError,
+)
 from app.schemas import NoteCreate, NoteUpdate
-
-
-class LectureNotFoundError(ValueError):
-    """Raised when a note references a lecture that does not exist."""
 
 
 def create_note(
@@ -19,6 +20,7 @@ def create_note(
     """Create and flush a note under an existing lecture."""
     if session.get(Lecture, lecture_id) is None:
         raise LectureNotFoundError(f"Lecture {lecture_id} does not exist")
+    _validate_page_association(session, lecture_id, note_data.page_id)
 
     note = Note(lecture_id=lecture_id, **note_data.model_dump())
     session.add(note)
@@ -41,7 +43,11 @@ def edit_note(
     if note is None:
         return None
 
-    for field, value in note_data.model_dump(exclude_unset=True).items():
+    updates = note_data.model_dump(exclude_unset=True)
+    if "page_id" in updates:
+        _validate_page_association(session, note.lecture_id, updates["page_id"])
+
+    for field, value in updates.items():
         setattr(note, field, value)
     session.flush()
     return note
@@ -66,3 +72,20 @@ def list_lecture_notes(session: Session, lecture_id: int) -> list[Note]:
         .order_by(Note.created_at, Note.id)
     )
     return list(session.scalars(statement).all())
+
+
+def _validate_page_association(
+    session: Session,
+    lecture_id: int,
+    page_id: int | None,
+) -> None:
+    if page_id is None:
+        return
+
+    page = session.get(SlidePage, page_id)
+    if page is None:
+        raise SlidePageNotFoundError(f"Slide page {page_id} does not exist")
+    if page.lecture_id != lecture_id:
+        raise NotePageMismatchError(
+            f"Slide page {page_id} belongs to lecture {page.lecture_id}, not {lecture_id}"
+        )
