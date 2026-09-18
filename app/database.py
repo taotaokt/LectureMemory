@@ -7,6 +7,7 @@ changes will require an explicit migration tool before they are introduced.
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +68,8 @@ def init_database(
     metadata: MetaData = Base.metadata,
 ) -> None:
     """Create all missing tables registered in the supplied metadata."""
+    if metadata is Base.metadata:
+        import_module("app.models")
     metadata.create_all(bind=database_engine)
 
 
