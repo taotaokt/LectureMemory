@@ -68,7 +68,7 @@ Planned core stack:
 - [x] Project packaging and repository structure
 - [x] pytest and Ruff configuration
 - [x] Import smoke test
-- [ ] Application configuration
+- [x] Application configuration
 - [ ] Course, lecture, slide, and note persistence
 - [ ] PDF ingestion and page rendering
 - [ ] Text extraction
