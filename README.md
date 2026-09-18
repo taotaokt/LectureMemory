@@ -72,7 +72,8 @@ Planned core stack:
 - [x] SQLite and SQLAlchemy database foundation
 - [x] Course persistence
 - [x] Lecture persistence and Course–Lecture relationships
-- [ ] Slide and note persistence
+- [x] Note persistence with optional slide-page references
+- [ ] Slide-page persistence
 - [ ] PDF ingestion and page rendering
 - [ ] Text extraction
 - [ ] Embedding providers and cache

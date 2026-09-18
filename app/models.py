@@ -70,9 +70,45 @@ class Lecture(Base):
         nullable=False,
     )
     course: Mapped[Course] = relationship(back_populates="lectures")
+    notes: Mapped[list["Note"]] = relationship(
+        back_populates="lecture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
         return (
             f"Lecture(id={self.id!r}, course_id={self.course_id!r}, "
             f"lecture_number={self.lecture_number!r}, title={self.title!r})"
         )
+
+
+class Note(Base):
+    """A personal note attached to a lecture and optionally a slide page."""
+
+    __tablename__ = "notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lecture_id: Mapped[int] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # SlidePage is introduced in Task 2.2; until then this stores its future ID.
+    page_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+    lecture: Mapped[Lecture] = relationship(back_populates="notes")
+
+    def __repr__(self) -> str:
+        return f"Note(id={self.id!r}, lecture_id={self.lecture_id!r}, page_id={self.page_id!r})"
