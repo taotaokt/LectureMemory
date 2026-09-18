@@ -78,6 +78,7 @@ Planned core stack:
 - [x] Idempotent PDF ingestion pipeline
 - [x] PDF text-layer extraction
 - [x] Model-independent embedding provider interface
+- [x] Qwen3-VL-Embedding-2B feasibility validation on Apple Silicon ([report](benchmark/QWEN3_VL_FEASIBILITY.md))
 - [ ] Production embedding provider and cache
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
