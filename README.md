@@ -69,6 +69,7 @@ Planned core stack:
 - [x] pytest and Ruff configuration
 - [x] Import smoke test
 - [x] Application configuration
+- [x] SQLite and SQLAlchemy database foundation
 - [ ] Course, lecture, slide, and note persistence
 - [ ] PDF ingestion and page rendering
 - [ ] Text extraction
