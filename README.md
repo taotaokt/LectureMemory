@@ -75,8 +75,8 @@ Planned core stack:
 - [x] Note persistence with optional slide-page references
 - [x] Slide-page persistence and validated note-page relationships
 - [x] PDF page rendering
-- [ ] PDF ingestion pipeline
-- [ ] Text extraction
+- [x] Idempotent PDF ingestion pipeline
+- [x] PDF text-layer extraction
 - [ ] Embedding providers and cache
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
