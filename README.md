@@ -77,7 +77,8 @@ Planned core stack:
 - [x] PDF page rendering
 - [x] Idempotent PDF ingestion pipeline
 - [x] PDF text-layer extraction
-- [ ] Embedding providers and cache
+- [x] Model-independent embedding provider interface
+- [ ] Production embedding provider and cache
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
 - [ ] Streamlit interface
