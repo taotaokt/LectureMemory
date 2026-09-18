@@ -79,7 +79,8 @@ Planned core stack:
 - [x] PDF text-layer extraction
 - [x] Model-independent embedding provider interface
 - [x] Qwen3-VL-Embedding-2B feasibility validation on Apple Silicon ([report](benchmark/QWEN3_VL_FEASIBILITY.md))
-- [ ] Production embedding provider and cache
+- [x] Production Qwen3-VL embedding provider
+- [ ] Embedding cache
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
 - [ ] Streamlit interface
@@ -106,6 +107,42 @@ Run the checks:
 pytest
 ruff check .
 ```
+
+### Optional Qwen embedding runtime
+
+The base installation stays lightweight. Install the local multimodal model runtime only on
+machines that will generate embeddings:
+
+```bash
+python -m pip install -e '.[qwen]'
+```
+
+The provider loads PyTorch and the model weights lazily on the first inference. With
+`DEVICE=auto`, it selects CUDA first, Apple MPS second, and CPU as a fallback.
+
+```python
+from app.config import get_settings
+from app.embeddings import Qwen3VLEmbeddingProvider
+
+settings = get_settings()
+provider = Qwen3VLEmbeddingProvider(
+    model_name=settings.model_name,
+    device=settings.device,
+    dtype=settings.embedding_dtype,
+    dimension=settings.embedding_dimension,
+    batch_size=settings.embedding_batch_size,
+    max_pixels=settings.embedding_max_pixels,
+    query_instruction=settings.embedding_query_instruction,
+)
+
+query_vector = provider.embed_query("Where did we discuss convex sets?")
+slide_vector = provider.embed_image("data/rendered/course-1/lecture-3/page-001.png")
+similarity = float(query_vector @ slide_vector)
+```
+
+The default model is downloaded from Hugging Face on first use. Set `MODEL_NAME` to a local
+model directory for an offline installation. Model weights and Hugging Face caches are ignored
+by Git.
 
 ## Planned Retrieval Evaluation
 

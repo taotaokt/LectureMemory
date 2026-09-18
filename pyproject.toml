@@ -24,6 +24,14 @@ dev = [
     "reportlab>=4.0",
     "ruff>=0.6",
 ]
+qwen = [
+    "accelerate>=1.12,<2",
+    "pillow>=10,<13",
+    "qwen-vl-utils>=0.0.14,<0.1",
+    "torch==2.8.*",
+    "torchvision>=0.23,<0.24",
+    "transformers>=4.57.3,<5",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*", "benchmark*", "frontend*"]

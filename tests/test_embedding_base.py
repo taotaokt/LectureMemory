@@ -83,13 +83,17 @@ def test_default_batch_methods_stack_vectors(tmp_path: Path) -> None:
 
     text_batch = provider.embed_texts(["first", "second"])
     image_batch = provider.embed_images([first_image, second_image])
+    query_batch = provider.embed_queries(["first query", "second query"])
 
     assert text_batch.shape == (2, 3)
     assert image_batch.shape == (2, 3)
+    assert query_batch.shape == (2, 3)
     assert text_batch.dtype == np.float32
     assert image_batch.dtype == np.float32
+    assert query_batch.dtype == np.float32
     assert np.linalg.norm(text_batch, axis=1) == pytest.approx([1.0, 1.0])
     assert np.linalg.norm(image_batch, axis=1) == pytest.approx([1.0, 1.0])
+    assert np.linalg.norm(query_batch, axis=1) == pytest.approx([1.0, 1.0])
 
 
 def test_empty_batches_have_stable_shape() -> None:
@@ -97,6 +101,7 @@ def test_empty_batches_have_stable_shape() -> None:
 
     assert provider.embed_texts([]).shape == (0, 3)
     assert provider.embed_images([]).shape == (0, 3)
+    assert provider.embed_queries([]).shape == (0, 3)
 
 
 @pytest.mark.parametrize("value", ["", "   "])

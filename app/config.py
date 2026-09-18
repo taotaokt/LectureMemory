@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,10 +26,39 @@ class Settings(BaseSettings):
     embedding_dir: Path | None = Field(default=None, validation_alias="EMBEDDING_DIR")
     index_dir: Path | None = Field(default=None, validation_alias="INDEX_DIR")
 
-    device: str = Field(default="auto", validation_alias="DEVICE")
+    device: Literal["auto", "cpu", "cuda", "mps"] = Field(
+        default="auto",
+        validation_alias="DEVICE",
+    )
     model_name: str = Field(
-        default="Qwen3-VL-Embedding",
+        default="Qwen/Qwen3-VL-Embedding-2B",
         validation_alias="MODEL_NAME",
+    )
+    embedding_dtype: Literal["auto", "float16", "bfloat16", "float32"] = Field(
+        default="auto",
+        validation_alias="EMBEDDING_DTYPE",
+    )
+    embedding_dimension: int = Field(
+        default=2048,
+        ge=64,
+        validation_alias="EMBEDDING_DIMENSION",
+    )
+    embedding_batch_size: int = Field(
+        default=1,
+        ge=1,
+        validation_alias="EMBEDDING_BATCH_SIZE",
+    )
+    embedding_max_pixels: int = Field(
+        default=512 * 32 * 32,
+        ge=4 * 32 * 32,
+        validation_alias="EMBEDDING_MAX_PIXELS",
+    )
+    embedding_query_instruction: str = Field(
+        default=(
+            "Retrieve the lecture slide image or note most relevant to the user's query."
+        ),
+        min_length=1,
+        validation_alias="EMBEDDING_QUERY_INSTRUCTION",
     )
     reranker_model_name: str = Field(
         default="Qwen3-VL-Reranker",

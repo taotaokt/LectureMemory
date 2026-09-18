@@ -7,6 +7,7 @@ from app.embeddings.base import (
     EmbeddingVector,
     InvalidEmbeddingError,
 )
+from app.embeddings.qwen import Qwen3VLEmbeddingProvider, QwenDependencyError
 
 __all__ = [
     "EmbeddingBatch",
@@ -14,4 +15,6 @@ __all__ = [
     "EmbeddingProvider",
     "EmbeddingVector",
     "InvalidEmbeddingError",
+    "Qwen3VLEmbeddingProvider",
+    "QwenDependencyError",
 ]

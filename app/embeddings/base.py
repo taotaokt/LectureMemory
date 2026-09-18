@@ -61,6 +61,10 @@ class EmbeddingProvider(ABC):
         """Embed an image batch, with a provider-overridable sequential default."""
         return self._stack_vectors([self.embed_image(path) for path in image_paths])
 
+    def embed_queries(self, queries: Sequence[str]) -> EmbeddingBatch:
+        """Embed a query batch, with a provider-overridable sequential default."""
+        return self._stack_vectors([self.embed_query(query) for query in queries])
+
     @abstractmethod
     def _embed_text(self, text: str) -> RawEmbedding:
         """Produce one raw text vector in the provider implementation."""

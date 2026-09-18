@@ -12,6 +12,11 @@ ENVIRONMENT_KEYS = (
     "INDEX_DIR",
     "DEVICE",
     "MODEL_NAME",
+    "EMBEDDING_DTYPE",
+    "EMBEDDING_DIMENSION",
+    "EMBEDDING_BATCH_SIZE",
+    "EMBEDDING_MAX_PIXELS",
+    "EMBEDDING_QUERY_INSTRUCTION",
     "RERANKER_MODEL_NAME",
 )
 
@@ -33,7 +38,12 @@ def test_settings_load_defaults(monkeypatch) -> None:
     assert settings.embedding_dir == PROJECT_ROOT / "data/embeddings"
     assert settings.index_dir == PROJECT_ROOT / "data/indexes"
     assert settings.device == "auto"
-    assert settings.model_name == "Qwen3-VL-Embedding"
+    assert settings.model_name == "Qwen/Qwen3-VL-Embedding-2B"
+    assert settings.embedding_dtype == "auto"
+    assert settings.embedding_dimension == 2048
+    assert settings.embedding_batch_size == 1
+    assert settings.embedding_max_pixels == 524288
+    assert settings.embedding_query_instruction.startswith("Retrieve the lecture slide")
     assert settings.reranker_model_name == "Qwen3-VL-Reranker"
 
 
@@ -52,6 +62,11 @@ def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("INDEX_DIR", str(custom_index_dir))
     monkeypatch.setenv("DEVICE", "mps")
     monkeypatch.setenv("MODEL_NAME", "test-embedding-model")
+    monkeypatch.setenv("EMBEDDING_DTYPE", "float32")
+    monkeypatch.setenv("EMBEDDING_DIMENSION", "512")
+    monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "3")
+    monkeypatch.setenv("EMBEDDING_MAX_PIXELS", "262144")
+    monkeypatch.setenv("EMBEDDING_QUERY_INSTRUCTION", "Find the relevant lecture material.")
     monkeypatch.setenv("RERANKER_MODEL_NAME", "test-reranker-model")
 
     settings = Settings(_env_file=None)
@@ -63,6 +78,11 @@ def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
     assert settings.index_dir == custom_index_dir
     assert settings.device == "mps"
     assert settings.model_name == "test-embedding-model"
+    assert settings.embedding_dtype == "float32"
+    assert settings.embedding_dimension == 512
+    assert settings.embedding_batch_size == 3
+    assert settings.embedding_max_pixels == 262144
+    assert settings.embedding_query_instruction == "Find the relevant lecture material."
     assert settings.reranker_model_name == "test-reranker-model"
 
 
