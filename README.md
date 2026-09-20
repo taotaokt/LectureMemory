@@ -2,7 +2,7 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion and slide embedding are available; vector retrieval and the user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion plus slide and note embedding are available; vector retrieval and the user interface are planned but not yet available.
 
 ## Why Lecture Memory?
 
@@ -82,6 +82,7 @@ Planned core stack:
 - [x] Production Qwen3-VL embedding provider
 - [x] Persistent embedding cache with content-hash invalidation
 - [x] Lecture slide-page embedding pipeline with per-page failure isolation
+- [x] Lecture note-text embedding pipeline with per-note failure isolation
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
 - [ ] Streamlit interface
@@ -193,9 +194,9 @@ similarity = float(query_vector @ slide_vector)
 Embedding vectors are stored as atomic `.npy` files under `EMBEDDING_DIR`, while SQLite keeps
 the entity type and ID, model name, vector dimension, relative file path, content hash, and
 creation time. Unchanged content reuses its vector; changed, missing, or corrupt entries are
-recomputed safely. `embed_lecture_slides` processes every persisted page in a lecture, reports
-generated, cached, and failed page counts, and isolates individual page failures so the remaining
-pages can still be indexed.
+recomputed safely. `embed_lecture_slides` and `embed_lecture_notes` process all persisted content
+for one lecture, report generated, cached, and failed item counts, and isolate individual failures
+so the remaining slides or notes can still be indexed.
 
 ## Planned Retrieval Evaluation
 
