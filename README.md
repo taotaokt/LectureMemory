@@ -2,7 +2,9 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, filtered retrieval, and the Qwen reranker adapter are available; the configured reranking workflow and user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
+> persistent indexing, filtered retrieval, and the configured Qwen reranking workflow are
+> available; the user interface is planned but not yet available.
 
 ## Why Lecture Memory?
 
@@ -88,7 +90,7 @@ Planned core stack:
 - [x] Course and lecture search filtering
 - [x] Model-independent reranker interface
 - [x] Qwen3-VL multimodal reranker adapter
-- [ ] Configured retrieval-to-rerank workflow
+- [x] Configured retrieval-to-rerank workflow
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
 
@@ -146,6 +148,10 @@ DEVICE=auto
 MODEL_NAME=Qwen/Qwen3-VL-Embedding-2B
 EMBEDDING_DTYPE=auto
 EMBEDDING_DIMENSION=2048
+RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
+RETRIEVAL_TOP_K=20
+RERANK_TOP_K=20
+FINAL_TOP_K=5
 ```
 
 Installing this optional runtime and downloading the default model require significant disk
@@ -221,6 +227,39 @@ per candidate, applies stable score ordering, and returns immutable results with
 `Qwen3VLReranker` implements that interface with lazy model loading and CUDA, Apple MPS, or CPU
 execution. Slide candidates use the rendered image together with extracted text when available;
 note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
+
+`search_and_rerank` connects the complete query path. By default it retrieves 20 vector-search
+candidates, sends up to 20 candidates to the reranker, and returns the best 5. Course and lecture
+filters are applied before reranking, empty indexes avoid loading either model, and configuration
+requires `FINAL_TOP_K <= RERANK_TOP_K <= RETRIEVAL_TOP_K`.
+
+```python
+from app.config import get_settings
+from app.retrieval import Qwen3VLReranker, search_and_rerank
+
+settings = get_settings()
+reranker = Qwen3VLReranker(
+    model_name=settings.reranker_model_name,
+    device=settings.device,
+    dtype=settings.reranker_dtype,
+    batch_size=settings.reranker_batch_size,
+    max_length=settings.reranker_max_length,
+    min_pixels=settings.reranker_min_pixels,
+    max_pixels=settings.reranker_max_pixels,
+    instruction=settings.reranker_instruction,
+)
+
+results = search_and_rerank(
+    session,
+    "Where did we discuss convex sets?",
+    provider=provider,
+    index=index,
+    reranker=reranker,
+    retrieval_top_k=settings.retrieval_top_k,
+    rerank_top_k=settings.rerank_top_k,
+    final_top_k=settings.final_top_k,
+)
+```
 
 ## Planned Retrieval Evaluation
 

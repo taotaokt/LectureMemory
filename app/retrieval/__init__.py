@@ -23,14 +23,21 @@ from app.retrieval.reranker import (
     RerankerError,
 )
 from app.retrieval.service import (
+    DEFAULT_FINAL_TOP_K,
+    DEFAULT_RERANK_TOP_K,
+    DEFAULT_RETRIEVAL_TOP_K,
     DEFAULT_TOP_K,
     RetrievalConfigurationError,
     SearchFilterMismatchError,
+    search_and_rerank,
     search_lecture_memory,
 )
 
 __all__ = [
     "DuplicateEntityError",
+    "DEFAULT_FINAL_TOP_K",
+    "DEFAULT_RERANK_TOP_K",
+    "DEFAULT_RETRIEVAL_TOP_K",
     "DEFAULT_TOP_K",
     "DEFAULT_RERANKER_INSTRUCTION",
     "DEFAULT_RERANKER_MODEL_NAME",
@@ -49,5 +56,6 @@ __all__ = [
     "SearchFilterMismatchError",
     "VectorIndexError",
     "VectorSearchResult",
+    "search_and_rerank",
     "search_lecture_memory",
 ]
