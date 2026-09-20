@@ -2,7 +2,7 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, filtered retrieval, and the reranker abstraction are available; production reranking and the user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, filtered retrieval, and the Qwen reranker adapter are available; the configured reranking workflow and user interface are planned but not yet available.
 
 ## Why Lecture Memory?
 
@@ -87,7 +87,8 @@ Planned core stack:
 - [x] Unified slide and note vector retrieval
 - [x] Course and lecture search filtering
 - [x] Model-independent reranker interface
-- [ ] Qwen3-VL multimodal reranking
+- [x] Qwen3-VL multimodal reranker adapter
+- [ ] Configured retrieval-to-rerank workflow
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
 
@@ -216,6 +217,10 @@ are returned.
 The `Reranker` abstraction accepts a query and normalized search candidates, validates one score
 per candidate, applies stable score ordering, and returns immutable results with updated ranks and
 `reranker_score` values. The original `raw_similarity` remains available for evaluation.
+
+`Qwen3VLReranker` implements that interface with lazy model loading and CUDA, Apple MPS, or CPU
+execution. Slide candidates use the rendered image together with extracted text when available;
+note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
 
 ## Planned Retrieval Evaluation
 

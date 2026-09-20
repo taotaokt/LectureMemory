@@ -9,6 +9,13 @@ from app.retrieval.index import (
     VectorIndexError,
     VectorSearchResult,
 )
+from app.retrieval.qwen_reranker import (
+    DEFAULT_RERANKER_INSTRUCTION,
+    DEFAULT_RERANKER_MODEL_NAME,
+    Qwen3VLReranker,
+    QwenRerankerDependencyError,
+    QwenRerankerError,
+)
 from app.retrieval.reranker import (
     InvalidRerankerOutputError,
     RawRerankerScores,
@@ -25,6 +32,8 @@ from app.retrieval.service import (
 __all__ = [
     "DuplicateEntityError",
     "DEFAULT_TOP_K",
+    "DEFAULT_RERANKER_INSTRUCTION",
+    "DEFAULT_RERANKER_MODEL_NAME",
     "FaissVectorIndex",
     "IndexedEntity",
     "IndexPersistenceError",
@@ -33,6 +42,9 @@ __all__ = [
     "RawRerankerScores",
     "Reranker",
     "RerankerError",
+    "Qwen3VLReranker",
+    "QwenRerankerDependencyError",
+    "QwenRerankerError",
     "RetrievalConfigurationError",
     "SearchFilterMismatchError",
     "VectorIndexError",
