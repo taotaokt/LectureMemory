@@ -158,18 +158,43 @@ first indexing or search operation can therefore take several minutes, depending
 connection, before inference begins. A network connection is required for this initial download;
 after it completes, later runs reuse the cached files automatically.
 
+The current command-line development workflow uses that lazy Hugging Face behavior directly. The
+planned end-user application will not begin a multi-gigabyte download silently. On the first
+operation that needs the model, it will present a guided installation step that shows the expected
+download size, selected storage location, detected compute device, and relevant warnings before
+the user confirms the download. Download progress will remain visible and failed or interrupted
+downloads should be retryable or resumable.
+
 By default, Hugging Face stores the downloaded model in its shared user cache (commonly
 `~/.cache/huggingface/hub`) rather than under this repository. Set `HF_HOME` to choose a
 different cache location, or set `MODEL_NAME` to an already-downloaded local model directory for
 offline use. Model weights and Hugging Face caches are ignored by Git.
 
+The packaged application will instead manage a dedicated model directory by default (for example,
+`~/Library/Application Support/LectureMemory/models/` on macOS) and allow the user to change it
+before downloading, including to an external drive. Model files will never be stored in the
+project repository or alongside course materials in `data/raw`.
+
 If the automatic download fails, check that the machine has at least 8 GiB of free space, can
 reach Hugging Face, and has permission to write to the configured cache directory, then retry.
 An interrupted Hugging Face download can normally resume rather than restarting from zero.
 
+Before the packaged application downloads a model, it will check the model size, temporary-space
+requirements, and a safety margin against the available disk space. Insufficient space will show
+the required and available capacity, warn the user, block the download, and offer actions to change
+the model location or run the check again. The interface will also surface actionable warnings for
+network or download failures, an unwritable model directory, incomplete or corrupt model files,
+and failed resume attempts rather than failing silently.
+
 With `DEVICE=auto`, the provider selects CUDA first, Apple MPS second, and CPU as a fallback.
 CPU mode is supported, but embedding a large slide collection can be substantially slower;
 Apple Silicon or a CUDA-capable GPU is recommended.
+
+The packaged application will keep CPU mode available, with a clear performance warning whenever
+it falls back to CPU. It will also warn when a requested CUDA or MPS accelerator is unavailable,
+when an accelerator cannot load the model because of memory or runtime compatibility problems,
+and when the application must offer CPU as the slower fallback. These warnings will identify the
+selected device and provide retry or settings actions where applicable.
 
 ```python
 from app.config import get_settings
