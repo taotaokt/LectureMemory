@@ -1,7 +1,7 @@
 """Pydantic request and response schemas for Lecture Memory."""
 
 from datetime import date, datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -115,3 +115,34 @@ class NoteRead(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
+
+
+EmbeddingEntityType = Literal["slide_page", "note"]
+
+
+class EmbeddingRecordCreate(BaseModel):
+    """Validated metadata for one cached embedding vector."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    entity_id: int = Field(gt=0)
+    entity_type: EmbeddingEntityType
+    model_name: str = Field(min_length=1, max_length=255)
+    dimension: int = Field(gt=0)
+    embedding_path: str = Field(min_length=1)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class EmbeddingRecordRead(BaseModel):
+    """Serializable representation of cached embedding metadata."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    entity_id: int
+    entity_type: EmbeddingEntityType
+    model_name: str
+    dimension: int
+    embedding_path: str
+    content_hash: str
+    created_at: datetime

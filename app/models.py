@@ -156,3 +156,38 @@ class Note(Base):
 
     def __repr__(self) -> str:
         return f"Note(id={self.id!r}, lecture_id={self.lecture_id!r}, page_id={self.page_id!r})"
+
+
+class EmbeddingRecord(Base):
+    """Metadata linking a domain entity to a cached embedding file."""
+
+    __tablename__ = "embedding_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "entity_type",
+            "entity_id",
+            "model_name",
+            "dimension",
+            name="uq_embedding_record_entity_model_dimension",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entity_id: Mapped[int] = mapped_column(nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    dimension: Mapped[int] = mapped_column(nullable=False)
+    embedding_path: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"EmbeddingRecord(id={self.id!r}, entity_type={self.entity_type!r}, "
+            f"entity_id={self.entity_id!r}, model_name={self.model_name!r}, "
+            f"dimension={self.dimension!r})"
+        )

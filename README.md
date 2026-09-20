@@ -80,7 +80,7 @@ Planned core stack:
 - [x] Model-independent embedding provider interface
 - [x] Qwen3-VL-Embedding-2B feasibility validation on Apple Silicon ([report](benchmark/QWEN3_VL_FEASIBILITY.md))
 - [x] Production Qwen3-VL embedding provider
-- [ ] Embedding cache
+- [x] Persistent embedding cache with content-hash invalidation
 - [ ] Vector retrieval and filtering
 - [ ] Multimodal reranking
 - [ ] Streamlit interface
@@ -143,6 +143,11 @@ similarity = float(query_vector @ slide_vector)
 The default model is downloaded from Hugging Face on first use. Set `MODEL_NAME` to a local
 model directory for an offline installation. Model weights and Hugging Face caches are ignored
 by Git.
+
+Embedding vectors are stored as atomic `.npy` files under `EMBEDDING_DIR`, while SQLite keeps
+the entity type and ID, model name, vector dimension, relative file path, content hash, and
+creation time. Unchanged content reuses its vector; changed, missing, or corrupt entries are
+recomputed safely.
 
 ## Planned Retrieval Evaluation
 
