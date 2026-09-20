@@ -34,6 +34,9 @@ env/
 models/
 huggingface/
 
+# Private lecture materials kept outside the managed data directory
+lectureSlides/
+
 # Generated application data
 data/raw/**
 data/rendered/**
@@ -58,4 +61,3 @@ data/database/**
 # Generated benchmark results
 benchmark/results/**
 !benchmark/results/.gitkeep
-
