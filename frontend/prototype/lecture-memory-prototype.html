@@ -1,0 +1,511 @@
+<style>
+  #lm-prototype {
+    width: 100%; min-height: 880px; overflow: hidden; border: 1px solid #e1e5e7; border-radius: 18px;
+    background: #ffffff; color: #273239; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    box-shadow: 0 18px 52px rgba(38, 49, 56, .1);
+  }
+  #lm-prototype * { box-sizing: border-box; }
+  #lm-prototype button, #lm-prototype input, #lm-prototype textarea, #lm-prototype select { font: inherit; }
+  #lm-prototype button { cursor: pointer; }
+  #lm-prototype h1, #lm-prototype h2, #lm-prototype h3, #lm-prototype p { margin: 0; }
+  #lm-prototype .lm-header {
+    height: 68px; display: flex; align-items: center; gap: 24px; padding: 0 26px;
+    border-bottom: 1px solid #e6e9eb; background: #ffffff;
+  }
+  #lm-prototype .lm-back {
+    width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto;
+    border: 1px solid #dfe4e6; border-radius: 9px; background: #ffffff; color: #4f5d63; font-size: 19px;
+  }
+  #lm-prototype .lm-back:hover { background: #f6f8f8; }
+  #lm-prototype .lm-back[hidden] { display: none; }
+  #lm-prototype .lm-brand {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto; border: 0; background: transparent;
+    color: #25343a; font-weight: 500; letter-spacing: -.02em;
+  }
+  #lm-prototype .lm-logo {
+    width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px;
+    background: #647f77; color: #ffffff; font-size: 12px; font-weight: 500;
+  }
+  #lm-prototype .lm-nav { display: flex; align-self: stretch; gap: 20px; }
+  #lm-prototype .lm-nav button {
+    position: relative; border: 0; background: transparent; color: #707b80; font-size: 13px;
+  }
+  #lm-prototype .lm-nav button[aria-current="page"] { color: #2b383e; font-weight: 500; }
+  #lm-prototype .lm-nav button[aria-current="page"]::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #6d8880;
+  }
+  #lm-prototype .lm-header-space { flex: 1; }
+  #lm-prototype .lm-header-search {
+    width: min(255px, 26vw); display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+    border: 1px solid #dfe4e6; border-radius: 9px; background: #f8f9f9; color: #7c878b;
+  }
+  #lm-prototype .lm-header-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #344148; font-size: 13px; }
+  #lm-prototype .lm-avatar {
+    width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%;
+    background: #d9c7ae; color: #584c3d; font-size: 13px; font-weight: 500;
+  }
+  #lm-prototype .lm-page { display: none; min-height: 812px; background: #ffffff; }
+  #lm-prototype .lm-page.is-active { display: block; }
+  #lm-prototype .lm-wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; padding: 34px 0 48px; }
+  #lm-prototype .lm-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+  #lm-prototype .lm-page-head h1 { color: #263239; font-size: clamp(26px, 3vw, 36px); font-weight: 500; letter-spacing: -.035em; }
+  #lm-prototype .lm-page-head p { margin-top: 7px; color: #7b858a; font-size: 13px; }
+  #lm-prototype .lm-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  #lm-prototype .lm-primary, #lm-prototype .lm-secondary, #lm-prototype .lm-quiet, #lm-prototype .lm-danger {
+    appearance: none; border-radius: 9px; padding: 9px 13px; font-size: 13px; font-weight: 500;
+  }
+  #lm-prototype .lm-primary { border: 1px solid #657f78; background: #657f78; color: #ffffff; }
+  #lm-prototype .lm-secondary { border: 1px solid #dbe0e2; background: #ffffff; color: #45535a; }
+  #lm-prototype .lm-quiet { border: 0; background: transparent; color: #6b807a; padding-left: 5px; padding-right: 5px; }
+  #lm-prototype .lm-danger { border: 1px solid #d7a5a5; background: #fff8f7; color: #9b5555; }
+  #lm-prototype .lm-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(220px, .8fr); gap: 18px; }
+  #lm-prototype .lm-global-search {
+    display: flex; align-items: center; gap: 9px; padding: 13px 15px; border: 1px solid #dce1e3;
+    border-radius: 12px; background: #ffffff; box-shadow: 0 5px 18px rgba(36, 50, 58, .05);
+  }
+  #lm-prototype .lm-global-search input { flex: 1; min-width: 0; border: 0; outline: 0; color: #334047; font-size: 14px; }
+  #lm-prototype .lm-global-search button { border: 0; border-radius: 8px; padding: 8px 12px; background: #657f78; color: #ffffff; font-size: 12px; }
+  #lm-prototype .lm-section-head { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 13px; }
+  #lm-prototype .lm-section-head h2 { color: #354148; font-size: 16px; font-weight: 500; }
+  #lm-prototype .lm-continue {
+    display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 16px; align-items: center;
+    padding: 16px; border: 1px solid #e0e4e6; border-radius: 13px; background: #ffffff;
+  }
+  #lm-prototype .lm-mini-slide { aspect-ratio: 16 / 10; padding: 11px; border-radius: 7px; background: #e7efec; color: #4d665e; font-size: 9px; }
+  #lm-prototype .lm-continue-title { margin-bottom: 5px; color: #334148; font-size: 14px; font-weight: 500; }
+  #lm-prototype .lm-meta { color: #7f898e; font-size: 12px; }
+  #lm-prototype .lm-progress-track { height: 5px; margin-top: 11px; border-radius: 10px; background: #e8eceb; overflow: hidden; }
+  #lm-prototype .lm-progress-value { height: 100%; width: 68%; border-radius: inherit; background: #7d9c91; }
+  #lm-prototype .lm-status-box {
+    padding: 17px; border: 1px solid #e0e4e6; border-radius: 13px; background: #fafbfb;
+  }
+  #lm-prototype .lm-status-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  #lm-prototype .lm-status-title { color: #3d4a50; font-size: 13px; font-weight: 500; }
+  #lm-prototype .lm-status-pill { padding: 4px 8px; border-radius: 20px; background: #fff1dc; color: #8d6935; font-size: 11px; }
+  #lm-prototype .lm-status-box p { margin-top: 9px; color: #768187; font-size: 12px; line-height: 1.5; }
+  #lm-prototype .lm-status-box button { margin-top: 12px; border: 0; background: transparent; color: #687f78; font-size: 12px; padding: 0; }
+  #lm-prototype .lm-course-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+  #lm-prototype .lm-course-card {
+    appearance: none; min-width: 0; overflow: hidden; padding: 0; border: 1px solid #e0e4e6; border-radius: 12px;
+    background: #ffffff; text-align: left; color: #303c42; box-shadow: 0 4px 14px rgba(35, 49, 57, .04);
+  }
+  #lm-prototype .lm-course-stripe { height: 9px; }
+  #lm-prototype .lm-course-body { padding: 17px; }
+  #lm-prototype .lm-course-code { margin-bottom: 8px; color: #7c878c; font-size: 11px; letter-spacing: .06em; }
+  #lm-prototype .lm-course-name { min-height: 38px; color: #303c42; font-size: 14px; font-weight: 500; line-height: 1.4; }
+  #lm-prototype .lm-course-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; color: #879095; font-size: 11px; }
+  #lm-prototype .lm-ai-future {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 24px; padding: 14px 0;
+    border-top: 1px solid #ebedef; color: #7e898e; font-size: 12px;
+  }
+  #lm-prototype .lm-ai-future button { border: 0; background: transparent; color: #758a83; font-size: 12px; }
+  #lm-prototype .lm-breadcrumb { display: flex; align-items: center; gap: 7px; margin-bottom: 15px; color: #828d92; font-size: 12px; }
+  #lm-prototype .lm-course-hero { display: flex; align-items: center; gap: 14px; }
+  #lm-prototype .lm-course-bar { width: 8px; height: 51px; border-radius: 8px; background: #7d9c91; }
+  #lm-prototype .lm-course-search { display: flex; align-items: center; gap: 8px; margin: 20px 0; padding: 11px 13px; border: 1px solid #dfe4e6; border-radius: 10px; }
+  #lm-prototype .lm-course-search input { flex: 1; min-width: 0; border: 0; outline: 0; color: #344148; font-size: 13px; }
+  #lm-prototype .lm-lecture-list { border-top: 1px solid #e5e8ea; }
+  #lm-prototype .lm-lecture-row {
+    width: 100%; display: grid; grid-template-columns: 54px minmax(0, 1fr) 104px 70px 112px 20px;
+    gap: 12px; align-items: center; padding: 17px 8px; border: 0; border-bottom: 1px solid #e8ebed;
+    background: #ffffff; color: #334047; text-align: left;
+  }
+  #lm-prototype .lm-lecture-row:hover { background: #fafbfb; }
+  #lm-prototype .lm-lecture-number { color: #6f8880; font-size: 12px; font-weight: 500; }
+  #lm-prototype .lm-lecture-title { margin-bottom: 4px; font-size: 14px; font-weight: 500; }
+  #lm-prototype .lm-lecture-date, #lm-prototype .lm-lecture-pages { color: #7e898e; font-size: 12px; }
+  #lm-prototype .lm-ready { color: #52786d; font-size: 11px; }
+  #lm-prototype .lm-working { color: #936f35; font-size: 11px; }
+  #lm-prototype .lm-empty-course { padding: 68px 20px; text-align: center; border: 1px dashed #cfd7d9; border-radius: 14px; background: #fbfcfc; }
+  #lm-prototype .lm-empty-icon { width: 52px; height: 52px; display: grid; place-items: center; margin: 0 auto 16px; border-radius: 14px; background: #e8efec; color: #698078; font-size: 23px; }
+  #lm-prototype .lm-empty-course h2 { color: #344148; font-size: 18px; font-weight: 500; }
+  #lm-prototype .lm-empty-course p { max-width: 420px; margin: 9px auto 18px; color: #78848a; font-size: 13px; line-height: 1.55; }
+  #lm-prototype .lm-lecture-shell { padding: 20px 18px 28px; }
+  #lm-prototype .lm-lecture-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  #lm-prototype .lm-lecture-top h1 { color: #29363c; font-size: 21px; font-weight: 500; }
+  #lm-prototype .lm-mobile-tabs { display: none; }
+  #lm-prototype .lm-reader { display: grid; grid-template-columns: 112px minmax(0, 1fr) 300px; gap: 12px; align-items: stretch; }
+  #lm-prototype .lm-thumbs, #lm-prototype .lm-slide-panel, #lm-prototype .lm-note-panel { border: 1px solid #e0e4e6; border-radius: 12px; background: #ffffff; overflow: hidden; }
+  #lm-prototype .lm-thumbs { padding: 11px; }
+  #lm-prototype .lm-thumb {
+    width: 100%; margin-bottom: 10px; padding: 5px; border: 2px solid transparent; border-radius: 8px;
+    background: transparent; color: #768187; font-size: 10px; text-align: left;
+  }
+  #lm-prototype .lm-thumb.is-selected { border-color: #7d9c91; background: #f3f7f5; }
+  #lm-prototype .lm-thumb-sheet { aspect-ratio: 16 / 10; display: grid; place-items: center; margin-bottom: 4px; background: #eef1f1; color: #798b85; font-size: 9px; }
+  #lm-prototype .lm-panel-head { height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; border-bottom: 1px solid #e6e9eb; color: #3b484e; font-size: 12px; font-weight: 500; }
+  #lm-prototype .lm-panel-controls { display: flex; gap: 6px; }
+  #lm-prototype .lm-icon-button { width: 30px; height: 30px; border: 1px solid #dfe4e6; border-radius: 8px; background: #ffffff; color: #56636a; }
+  #lm-prototype .lm-slide-stage { min-height: 472px; display: grid; place-items: center; padding: 24px; background: #f1f3f3; }
+  #lm-prototype .lm-slide-page { width: 100%; aspect-ratio: 16 / 10; padding: 9%; background: #fffef9; box-shadow: 0 9px 28px rgba(37, 49, 56, .13); color: #33423e; }
+  #lm-prototype .lm-slide-kicker { margin-bottom: 7%; color: #789088; font-size: 10px; letter-spacing: .12em; }
+  #lm-prototype .lm-slide-page h2 { max-width: 90%; font-size: clamp(20px, 3vw, 33px); font-weight: 500; letter-spacing: -.035em; line-height: 1.15; }
+  #lm-prototype .lm-diagram { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 13%; }
+  #lm-prototype .lm-diagram div:nth-child(odd) { padding: 10px 6px; border-radius: 7px; background: #e5eeea; text-align: center; font-size: 9px; }
+  #lm-prototype .lm-note-body { padding: 16px; }
+  #lm-prototype .lm-note-context { margin-bottom: 13px; padding: 12px; border-left: 4px solid #7d9c91; border-radius: 0 7px 7px 0; background: #f5f8f7; color: #4f5c62; font-size: 12px; line-height: 1.55; }
+  #lm-prototype .lm-note-area { width: 100%; min-height: 250px; resize: vertical; padding: 12px; border: 1px solid #dfe4e6; border-radius: 8px; outline: 0; color: #354249; background: #ffffff; font-size: 13px; line-height: 1.6; }
+  #lm-prototype .lm-save-state { display: flex; align-items: center; justify-content: space-between; min-height: 34px; margin-top: 9px; color: #78848a; font-size: 11px; }
+  #lm-prototype .lm-save-error { color: #a15555; }
+  #lm-prototype .lm-note-panel.is-collapsed { display: none; }
+  #lm-prototype .lm-reader.notes-collapsed { grid-template-columns: 112px minmax(0, 1fr); }
+  #lm-prototype .lm-search-top { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
+  #lm-prototype .lm-search-top input { flex: 1; min-width: 0; padding: 12px 14px; border: 1px solid #dce1e3; border-radius: 10px; outline: 0; color: #344148; font-size: 14px; }
+  #lm-prototype .lm-search-layout { display: grid; grid-template-columns: 150px minmax(250px, .9fr) minmax(280px, 1.1fr); gap: 16px; }
+  #lm-prototype .lm-filters { padding-right: 13px; border-right: 1px solid #e5e8ea; }
+  #lm-prototype .lm-filter-group { margin-bottom: 22px; }
+  #lm-prototype .lm-filter-group h3 { margin-bottom: 10px; color: #46545a; font-size: 12px; font-weight: 500; }
+  #lm-prototype .lm-check { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #69757b; font-size: 12px; }
+  #lm-prototype .lm-result-list { min-width: 0; }
+  #lm-prototype .lm-result-count { margin-bottom: 10px; color: #7d878c; font-size: 12px; }
+  #lm-prototype .lm-result {
+    width: 100%; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; margin-bottom: 10px; padding: 11px;
+    border: 1px solid #e1e5e7; border-radius: 10px; background: #ffffff; color: #354148; text-align: left;
+  }
+  #lm-prototype .lm-result.is-selected { border-color: #8da59d; background: #f7faf8; }
+  #lm-prototype .lm-result-thumb { aspect-ratio: 16 / 10; display: grid; place-items: center; background: #e7efec; color: #607870; font-size: 9px; }
+  #lm-prototype .lm-result-title { margin-bottom: 5px; font-size: 13px; font-weight: 500; }
+  #lm-prototype .lm-result-snippet { color: #748086; font-size: 11px; line-height: 1.45; }
+  #lm-prototype .lm-preview { min-width: 0; border-left: 1px solid #e5e8ea; padding-left: 16px; }
+  #lm-prototype .lm-preview-image { aspect-ratio: 16 / 10; display: grid; place-items: center; padding: 12%; background: #f0f2f2; }
+  #lm-prototype .lm-preview-slide { width: 100%; height: 100%; padding: 10%; background: #fffef9; color: #43524d; box-shadow: 0 6px 18px rgba(34, 46, 53, .11); font-size: 13px; }
+  #lm-prototype .lm-match { margin: 14px 0; padding: 12px; border-left: 4px solid #7d9c91; background: #f5f8f7; color: #56636a; font-size: 12px; line-height: 1.55; }
+  #lm-prototype mark { background: #efe3b5; color: inherit; }
+  #lm-prototype .lm-no-results { display: none; padding: 52px 20px; text-align: center; }
+  #lm-prototype .lm-no-results h2 { color: #354148; font-size: 18px; font-weight: 500; }
+  #lm-prototype .lm-no-results p { margin: 9px 0 18px; color: #7b868b; font-size: 13px; }
+  #lm-prototype .lm-example-list { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 15px 0; }
+  #lm-prototype .lm-example-list button { border: 1px solid #dfe4e6; border-radius: 20px; padding: 7px 10px; background: #ffffff; color: #68777d; font-size: 11px; }
+  #lm-prototype .lm-upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 22px; }
+  #lm-prototype .lm-file-head { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; padding-bottom: 17px; border-bottom: 1px solid #e5e8ea; }
+  #lm-prototype .lm-file-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; background: #e8efec; color: #637b73; }
+  #lm-prototype .lm-file-name { color: #354148; font-size: 14px; font-weight: 500; }
+  #lm-prototype .lm-stage {
+    width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 11px; align-items: center;
+    padding: 13px 10px; border: 0; border-bottom: 1px solid #e8ebed; background: #ffffff; color: #38454b; text-align: left;
+  }
+  #lm-prototype .lm-stage.is-selected { background: #f7faf8; }
+  #lm-prototype .lm-stage-index { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #eef1f1; color: #66737a; font-size: 10px; }
+  #lm-prototype .lm-stage.is-done .lm-stage-index { background: #dfece7; color: #4e7669; }
+  #lm-prototype .lm-stage.is-failed .lm-stage-index { background: #f5dddd; color: #a44e4e; }
+  #lm-prototype .lm-stage-name { margin-bottom: 3px; font-size: 13px; font-weight: 500; }
+  #lm-prototype .lm-stage-sub { color: #808a8f; font-size: 11px; }
+  #lm-prototype .lm-stage-status { color: #718078; font-size: 11px; }
+  #lm-prototype .lm-stage.is-failed .lm-stage-status { color: #a14f4f; }
+  #lm-prototype .lm-stage-detail { padding: 18px; border: 1px solid #e0e4e6; border-radius: 12px; background: #fafbfb; }
+  #lm-prototype .lm-stage-detail h2 { margin-bottom: 8px; color: #354148; font-size: 15px; font-weight: 500; }
+  #lm-prototype .lm-stage-detail p { color: #758086; font-size: 12px; line-height: 1.55; }
+  #lm-prototype .lm-stage-detail .lm-actions { margin-top: 15px; }
+  #lm-prototype .lm-generated-pages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 14px; }
+  #lm-prototype .lm-generated-pages div { aspect-ratio: 16 / 10; display: grid; place-items: center; background: #e9eeee; color: #708078; font-size: 10px; }
+  #lm-prototype .lm-upload-complete { display: none; margin-top: 17px; padding-top: 16px; border-top: 1px solid #e4e8e9; }
+  #lm-prototype .lm-upload-complete p { margin-bottom: 12px; color: #4e7468; }
+  @media (max-width: 900px) {
+    #lm-prototype .lm-search-layout { grid-template-columns: 130px minmax(240px, 1fr); }
+    #lm-prototype .lm-preview { grid-column: 1 / -1; border-left: 0; border-top: 1px solid #e5e8ea; padding: 16px 0 0; }
+  }
+  @media (max-width: 700px) {
+    #lm-prototype .lm-header { gap: 12px; padding: 0 15px; }
+    #lm-prototype .lm-nav, #lm-prototype .lm-header-search { display: none; }
+    #lm-prototype .lm-dashboard-grid, #lm-prototype .lm-upload-layout { grid-template-columns: 1fr; }
+    #lm-prototype .lm-course-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #lm-prototype .lm-reader { display: block; }
+    #lm-prototype .lm-thumbs { display: none; }
+    #lm-prototype .lm-mobile-tabs { display: flex; gap: 5px; padding: 4px; border-radius: 9px; background: #eef1f1; }
+    #lm-prototype .lm-mobile-tabs button { flex: 1; border: 0; border-radius: 7px; padding: 8px; background: transparent; color: #6f7b80; font-size: 12px; }
+    #lm-prototype .lm-mobile-tabs button.is-active { background: #ffffff; color: #344148; }
+    #lm-prototype .lm-note-panel { display: none; margin-top: 10px; }
+    #lm-prototype .lm-reader.mobile-notes .lm-slide-panel { display: none; }
+    #lm-prototype .lm-reader.mobile-notes .lm-note-panel { display: block; }
+    #lm-prototype .lm-search-layout { grid-template-columns: 1fr; }
+    #lm-prototype .lm-filters { border-right: 0; border-bottom: 1px solid #e5e8ea; padding: 0 0 10px; }
+    #lm-prototype .lm-filter-group { display: inline-block; margin: 0 18px 8px 0; vertical-align: top; }
+    #lm-prototype .lm-preview { grid-column: auto; }
+  }
+  @media (max-width: 480px) {
+    #lm-prototype .lm-brand span:last-child { display: none; }
+    #lm-prototype .lm-wrap { width: calc(100% - 28px); }
+    #lm-prototype .lm-page-head { align-items: flex-start; flex-direction: column; }
+    #lm-prototype .lm-course-grid { grid-template-columns: 1fr; }
+    #lm-prototype .lm-continue { grid-template-columns: 82px minmax(0, 1fr); }
+    #lm-prototype .lm-continue .lm-primary { grid-column: 1 / -1; }
+    #lm-prototype .lm-lecture-row { grid-template-columns: 44px minmax(0, 1fr) 20px; }
+    #lm-prototype .lm-lecture-date, #lm-prototype .lm-lecture-pages, #lm-prototype .lm-ready, #lm-prototype .lm-working { display: none; }
+  }
+</style>
+
+<div id="lm-prototype">
+  <header class="lm-header">
+    <button type="button" class="lm-back" id="lm-back" aria-label="Back" hidden>‹</button>
+    <button type="button" class="lm-brand" data-go="dashboard"><span class="lm-logo">LM</span><span>Lecture Memory</span></button>
+    <nav class="lm-nav" aria-label="Main navigation">
+      <button type="button" data-go="dashboard" aria-current="page">Dashboard</button>
+      <button type="button" data-go="course">Courses</button>
+      <button type="button" data-go="search">Search</button>
+    </nav>
+    <div class="lm-header-space"></div>
+    <form class="lm-header-search" id="lm-header-search"><span>⌕</span><input aria-label="Global search" placeholder="Search everything"></form>
+    <div class="lm-avatar">T</div>
+  </header>
+
+  <section class="lm-page is-active" data-page="dashboard">
+    <div class="lm-wrap">
+      <div class="lm-page-head">
+        <div><h1>Your learning dashboard</h1><p>Continue a lecture, find an idea, or add new material.</p></div>
+        <div class="lm-actions"><button type="button" class="lm-secondary" id="lm-create-course">＋ Create course</button><button type="button" class="lm-primary" data-go="upload">Upload PDF</button></div>
+      </div>
+      <form class="lm-global-search" id="lm-global-search"><span>⌕</span><input aria-label="Search course memory" placeholder="Where did we discuss three-subproblem multiplication?"><button type="submit">Search</button></form>
+      <div class="lm-dashboard-grid">
+        <div>
+          <div class="lm-section-head"><h2>Continue learning</h2><button type="button" class="lm-quiet">View history</button></div>
+          <div class="lm-continue">
+            <div class="lm-mini-slide">Divide &amp; Conquer<br><br>3 recursive calls</div>
+            <div><div class="lm-continue-title">CS 344 · Integer Multiplication</div><div class="lm-meta">Lecture 03 · Page 17 of 24 · Last opened yesterday</div><div class="lm-progress-track"><div class="lm-progress-value"></div></div></div>
+            <button type="button" class="lm-primary" data-go="lecture">Continue</button>
+          </div>
+        </div>
+        <div>
+          <div class="lm-section-head"><h2>Background processing</h2></div>
+          <div class="lm-status-box"><div class="lm-status-top"><span class="lm-status-title">ML Lecture 10</span><span class="lm-status-pill">Indexing</span></div><p>18 of 26 pages are ready. You can leave this page safely.</p><div class="lm-progress-track"><div class="lm-progress-value" style="width:72%;background:#a58cac"></div></div><button type="button" data-go="upload">View processing details →</button></div>
+        </div>
+      </div>
+      <div class="lm-section-head"><h2>Your courses</h2><button type="button" class="lm-quiet">View all</button></div>
+      <div class="lm-course-grid">
+        <button type="button" class="lm-course-card" data-open-course="algorithms"><div class="lm-course-stripe" style="background:#7d9c91"></div><div class="lm-course-body"><div class="lm-course-code">CS 344</div><div class="lm-course-name">Design &amp; Analysis of Algorithms</div><div class="lm-course-foot"><span>12 lectures</span><span>Updated today</span></div></div></button>
+        <button type="button" class="lm-course-card" data-open-course="linear"><div class="lm-course-stripe" style="background:#7897b2"></div><div class="lm-course-body"><div class="lm-course-code">MATH 320</div><div class="lm-course-name">Linear Algebra</div><div class="lm-course-foot"><span>8 lectures</span><span>Sep 15</span></div></div></button>
+        <button type="button" class="lm-course-card" data-open-course="machine"><div class="lm-course-stripe" style="background:#a58cac"></div><div class="lm-course-body"><div class="lm-course-code">CS 451</div><div class="lm-course-name">Machine Learning</div><div class="lm-course-foot"><span>10 lectures</span><span>Processing</span></div></div></button>
+        <button type="button" class="lm-course-card" data-open-course="statistics"><div class="lm-course-stripe" style="background:#c19378"></div><div class="lm-course-body"><div class="lm-course-code">STAT 410</div><div class="lm-course-name">Probability &amp; Statistics</div><div class="lm-course-foot"><span>7 lectures</span><span>Sep 10</span></div></div></button>
+        <button type="button" class="lm-course-card" data-open-course="systems"><div class="lm-course-stripe" style="background:#c0aa70"></div><div class="lm-course-body"><div class="lm-course-code">CS 356</div><div class="lm-course-name">Computer Systems</div><div class="lm-course-foot"><span>9 lectures</span><span>Sep 8</span></div></div></button>
+        <button type="button" class="lm-course-card" data-open-course="empty"><div class="lm-course-stripe" style="background:#8fa3a1"></div><div class="lm-course-body"><div class="lm-course-code">HIST 101</div><div class="lm-course-name">Modern World History</div><div class="lm-course-foot"><span>0 lectures</span><span>New</span></div></div></button>
+      </div>
+      <div class="lm-ai-future"><span>✦ AI answers across your course memory are coming later.</span><button type="button">Learn what’s planned →</button></div>
+    </div>
+  </section>
+
+  <section class="lm-page" data-page="course">
+    <div class="lm-wrap">
+      <div class="lm-breadcrumb"><button type="button" class="lm-quiet" data-go="dashboard">Dashboard</button><span>›</span><span>CS 344</span></div>
+      <div class="lm-page-head">
+        <div class="lm-course-hero"><div class="lm-course-bar" id="lm-course-color"></div><div><h1 id="lm-course-name">Design &amp; Analysis of Algorithms</h1><p id="lm-course-description">CS 344 · Fall 2026 · 12 lectures</p></div></div>
+        <div class="lm-actions"><button type="button" class="lm-secondary">＋ Add lecture</button><button type="button" class="lm-primary" data-go="upload">Upload PDF</button></div>
+      </div>
+      <label class="lm-course-search"><span>⌕</span><input id="lm-course-search-input" placeholder="Search within this course" aria-label="Search within this course"></label>
+      <div id="lm-course-content">
+        <div class="lm-section-head"><h2>Lectures</h2><span class="lm-meta">Sorted by lecture number</span></div>
+        <div class="lm-lecture-list">
+          <button type="button" class="lm-lecture-row" data-go="lecture"><span class="lm-lecture-number">01</span><span><span class="lm-lecture-title">Algorithm Analysis</span><span class="lm-meta">Asymptotic growth and running time</span></span><span class="lm-lecture-date">Sep 3, 2026</span><span class="lm-lecture-pages">31 pages</span><span class="lm-ready">● Ready</span><span>›</span></button>
+          <button type="button" class="lm-lecture-row" data-go="lecture"><span class="lm-lecture-number">02</span><span><span class="lm-lecture-title">Divide and Conquer</span><span class="lm-meta">Recurrences and merge sort</span></span><span class="lm-lecture-date">Sep 8, 2026</span><span class="lm-lecture-pages">28 pages</span><span class="lm-ready">● Ready</span><span>›</span></button>
+          <button type="button" class="lm-lecture-row" data-go="lecture"><span class="lm-lecture-number">03</span><span><span class="lm-lecture-title">Integer Multiplication</span><span class="lm-meta">Karatsuba and three subproblems</span></span><span class="lm-lecture-date">Sep 10, 2026</span><span class="lm-lecture-pages">24 pages</span><span class="lm-ready">● Ready</span><span>›</span></button>
+          <button type="button" class="lm-lecture-row" data-go="upload"><span class="lm-lecture-number">04</span><span><span class="lm-lecture-title">Master Theorem</span><span class="lm-meta">Uploaded 4 minutes ago</span></span><span class="lm-lecture-date">Sep 15, 2026</span><span class="lm-lecture-pages">18 pages</span><span class="lm-working">◐ Indexing</span><span>›</span></button>
+        </div>
+      </div>
+      <div class="lm-empty-course" id="lm-empty-course" hidden><div class="lm-empty-icon">⇧</div><h2>Add your first lecture</h2><p>Upload lecture slides to start building this course memory. Pages will appear as soon as rendering finishes.</p><div class="lm-actions" style="justify-content:center"><button type="button" class="lm-primary" data-go="upload">Upload PDF</button><button type="button" class="lm-secondary">Create lecture manually</button></div></div>
+    </div>
+  </section>
+
+  <section class="lm-page" data-page="lecture">
+    <div class="lm-lecture-shell">
+      <div class="lm-breadcrumb"><button type="button" class="lm-quiet" data-go="course">CS 344</button><span>›</span><span>Lecture 03</span></div>
+      <div class="lm-lecture-top">
+        <div><h1>Integer Multiplication</h1><div class="lm-meta">Lecture 03 · Sep 10, 2026 · Page <span id="lm-current-page">17</span> of 24</div></div>
+        <div class="lm-actions"><button type="button" class="lm-secondary" id="lm-collapse-notes">Hide notes</button><button type="button" class="lm-primary" data-go="search">Search course</button></div>
+      </div>
+      <div class="lm-mobile-tabs" aria-label="Lecture mobile view"><button type="button" class="is-active" data-mobile-view="slide">Slide</button><button type="button" data-mobile-view="notes">Notes</button></div>
+      <div class="lm-reader" id="lm-reader">
+        <aside class="lm-thumbs" aria-label="Slide thumbnails">
+          <button type="button" class="lm-thumb" data-slide="15"><span class="lm-thumb-sheet">Recurrence</span>15</button>
+          <button type="button" class="lm-thumb" data-slide="16"><span class="lm-thumb-sheet">Divide</span>16</button>
+          <button type="button" class="lm-thumb is-selected" data-slide="17"><span class="lm-thumb-sheet">3 calls</span>17</button>
+          <button type="button" class="lm-thumb" data-slide="18"><span class="lm-thumb-sheet">Karatsuba</span>18</button>
+          <button type="button" class="lm-thumb" data-slide="19"><span class="lm-thumb-sheet">Runtime</span>19</button>
+        </aside>
+        <section class="lm-slide-panel">
+          <div class="lm-panel-head"><span>Slide <span id="lm-slide-label-number">17</span></span><div class="lm-panel-controls"><button type="button" class="lm-icon-button" id="lm-prev-slide" aria-label="Previous page">‹</button><button type="button" class="lm-icon-button" id="lm-next-slide" aria-label="Next page">›</button></div></div>
+          <div class="lm-slide-stage"><div class="lm-slide-page"><div class="lm-slide-kicker">DIVIDE &amp; CONQUER</div><h2 id="lm-slide-title">Three-subproblem multiplication</h2><div class="lm-diagram"><div>Split</div><span>→</span><div>3 recursive calls</div><span>→</span><div>Combine</div></div></div></div>
+        </section>
+        <section class="lm-note-panel" id="lm-note-panel">
+          <div class="lm-panel-head"><span>Notes for page <span id="lm-note-page">17</span></span><button type="button" class="lm-quiet" id="lm-panel-collapse">Collapse</button></div>
+          <div class="lm-note-body">
+            <div class="lm-note-context">Why does reducing four recursive calls to three improve complexity?</div>
+            <textarea class="lm-note-area" id="lm-note-area" aria-label="Notes for current page">The key is reducing the number of recursive multiplications. This changes the exponent in the recurrence, not only the constant factor.</textarea>
+            <div class="lm-save-state" aria-live="polite"><span id="lm-save-status">Saved just now</span><button type="button" class="lm-quiet" id="lm-force-error">Test failure</button></div>
+            <div id="lm-save-retry" hidden><button type="button" class="lm-danger" id="lm-retry-save">Retry save</button></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="lm-page" data-page="search">
+    <div class="lm-wrap">
+      <div class="lm-page-head"><div><h1>Search course memory</h1><p>Results combine slide content, visual similarity, and your notes.</p></div></div>
+      <form class="lm-search-top" id="lm-search-form"><input id="lm-search-input" aria-label="Search query" value="three-subproblem multiplication"><button type="submit" class="lm-primary">Search</button></form>
+      <div id="lm-results-state">
+        <div class="lm-search-layout">
+          <aside class="lm-filters" aria-label="Search filters">
+            <div class="lm-filter-group"><h3>Course</h3><label class="lm-check"><input type="checkbox" checked> CS 344</label><label class="lm-check"><input type="checkbox"> MATH 320</label><label class="lm-check"><input type="checkbox"> CS 451</label></div>
+            <div class="lm-filter-group"><h3>Content</h3><label class="lm-check"><input type="checkbox" checked> Slides</label><label class="lm-check"><input type="checkbox" checked> Notes</label></div>
+            <button type="button" class="lm-quiet" id="lm-clear-filters">Clear filters</button>
+          </aside>
+          <div class="lm-result-list"><div class="lm-result-count">3 results in CS 344</div>
+            <button type="button" class="lm-result is-selected" data-result="0"><span class="lm-result-thumb">3 calls</span><span><span class="lm-result-title">Lecture 03 · Page 17</span><span class="lm-result-snippet">Three-subproblem integer multiplication and the recurrence behind Karatsuba.</span></span></button>
+            <button type="button" class="lm-result" data-result="1"><span class="lm-result-thumb" style="background:#e9e7f0;color:#75687b">Recurrence</span><span><span class="lm-result-title">Lecture 03 · Page 18</span><span class="lm-result-snippet">Solving the recurrence T(n) = 3T(n/2) + O(n).</span></span></button>
+            <button type="button" class="lm-result" data-result="2"><span class="lm-result-thumb" style="background:#e5edf2;color:#617481">Divide</span><span><span class="lm-result-title">Lecture 02 · Page 12</span><span class="lm-result-snippet">General divide-and-conquer template with recursive subproblems.</span></span></button>
+          </div>
+          <aside class="lm-preview">
+            <div class="lm-preview-image"><div class="lm-preview-slide"><strong id="lm-preview-title">Three-subproblem multiplication</strong><br><br><span id="lm-preview-copy">Split the operands, compute three products, then combine.</span></div></div>
+            <div class="lm-match" id="lm-preview-match">Matched content: “reducing four recursive calls to <mark>three</mark> changes the exponent.”</div>
+            <div class="lm-meta" id="lm-preview-meta">CS 344 · Lecture 03 · Page 17</div>
+            <div class="lm-actions" style="margin-top:13px"><button type="button" class="lm-primary" data-go="lecture">Open original location</button></div>
+          </aside>
+        </div>
+      </div>
+      <div class="lm-no-results" id="lm-no-results"><h2>No matching slides or notes</h2><p>Try using a concept instead of an exact phrase, or broaden where we search.</p><div class="lm-example-list"><button type="button" data-example="Karatsuba recurrence">Karatsuba recurrence</button><button type="button" data-example="why three recursive calls">why three recursive calls</button><button type="button" data-example="divide and conquer runtime">divide and conquer runtime</button></div><div class="lm-actions" style="justify-content:center"><button type="button" class="lm-secondary" id="lm-empty-clear">Clear filters</button><button type="button" class="lm-secondary" data-go="course">Back to course</button></div></div>
+    </div>
+  </section>
+
+  <section class="lm-page" data-page="upload">
+    <div class="lm-wrap">
+      <div class="lm-page-head"><div><h1>Processing lecture</h1><p>Master Theorem · CS 344 · lecture-04.pdf</p></div><button type="button" class="lm-secondary" id="lm-background">Continue in background</button></div>
+      <div class="lm-upload-layout">
+        <div>
+          <div class="lm-file-head"><div class="lm-file-icon">PDF</div><div><div class="lm-file-name">lecture-04.pdf</div><div class="lm-meta">18 pages · 6.4 MB</div></div></div>
+          <div id="lm-stages">
+            <button type="button" class="lm-stage is-done" data-stage="upload"><span class="lm-stage-index">✓</span><span><span class="lm-stage-name">Upload</span><span class="lm-stage-sub">File stored safely</span></span><span class="lm-stage-status">Complete</span></button>
+            <button type="button" class="lm-stage is-done" data-stage="render"><span class="lm-stage-index">✓</span><span><span class="lm-stage-name">Render pages</span><span class="lm-stage-sub">18 slide images generated</span></span><span class="lm-stage-status">Complete</span></button>
+            <button type="button" class="lm-stage is-done" data-stage="extract"><span class="lm-stage-index">✓</span><span><span class="lm-stage-name">Extract content</span><span class="lm-stage-sub">Text found on 16 pages</span></span><span class="lm-stage-status">Complete</span></button>
+            <button type="button" class="lm-stage is-failed is-selected" data-stage="embed" id="lm-embed-stage"><span class="lm-stage-index">!</span><span><span class="lm-stage-name">Generate vectors</span><span class="lm-stage-sub" id="lm-embed-sub">Model ran out of memory on page 14</span></span><span class="lm-stage-status" id="lm-embed-status">Failed</span></button>
+            <button type="button" class="lm-stage" data-stage="index" id="lm-index-stage"><span class="lm-stage-index">5</span><span><span class="lm-stage-name">Build index</span><span class="lm-stage-sub" id="lm-index-sub">Waiting for vectors</span></span><span class="lm-stage-status" id="lm-index-status">Waiting</span></button>
+          </div>
+          <div class="lm-upload-complete" id="lm-upload-complete"><p>✓ Lecture is ready to study and search.</p><div class="lm-actions"><button type="button" class="lm-primary" data-go="lecture">Open lecture</button><button type="button" class="lm-secondary" data-go="search">Start searching</button></div></div>
+        </div>
+        <aside class="lm-stage-detail">
+          <h2 id="lm-detail-title">Generate vectors</h2><p id="lm-detail-copy">Embedding stopped at page 14 because the model ran out of available memory. Pages 1–13 are preserved.</p>
+          <div class="lm-generated-pages" id="lm-generated-pages"><div>Page 1</div><div>Page 2</div><div>Page 3</div><div>Page 4</div><div>Page 5</div><div>+ 8 ready</div></div>
+          <div class="lm-actions"><button type="button" class="lm-danger" id="lm-retry-stage">Retry failed stage</button><button type="button" class="lm-secondary" id="lm-view-pages">View generated pages</button></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const root = document.getElementById('lm-prototype');
+    const pages = [...root.querySelectorAll('.lm-page')];
+    const navButtons = [...root.querySelectorAll('.lm-nav button[data-go]')];
+    const backButton = root.querySelector('#lm-back');
+    const pageHistory = [];
+    let currentPage = 'dashboard';
+    const show = (name, remember = true) => {
+      if (name === currentPage) return;
+      if (remember) pageHistory.push(currentPage);
+      currentPage = name;
+      pages.forEach((page) => page.classList.toggle('is-active', page.dataset.page === name));
+      navButtons.forEach((button) => button.setAttribute('aria-current', button.dataset.go === name ? 'page' : 'false'));
+      backButton.hidden = name === 'dashboard';
+    };
+    root.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => show(button.dataset.go)));
+    backButton.addEventListener('click', () => {
+      const previousPage = pageHistory.pop() || 'dashboard';
+      show(previousPage, false);
+    });
+    const courseData = {
+      algorithms: ['Design & Analysis of Algorithms', 'CS 344 · Fall 2026 · 12 lectures', '#7d9c91', false],
+      linear: ['Linear Algebra', 'MATH 320 · Fall 2026 · 8 lectures', '#7897b2', false],
+      machine: ['Machine Learning', 'CS 451 · Fall 2026 · 10 lectures', '#a58cac', false],
+      statistics: ['Probability & Statistics', 'STAT 410 · Fall 2026 · 7 lectures', '#c19378', false],
+      systems: ['Computer Systems', 'CS 356 · Fall 2026 · 9 lectures', '#c0aa70', false],
+      empty: ['Modern World History', 'HIST 101 · Fall 2026 · No lectures yet', '#8fa3a1', true]
+    };
+    root.querySelectorAll('[data-open-course]').forEach((card) => card.addEventListener('click', () => {
+      const data = courseData[card.dataset.openCourse];
+      root.querySelector('#lm-course-name').textContent = data[0];
+      root.querySelector('#lm-course-description').textContent = data[1];
+      root.querySelector('#lm-course-color').style.background = data[2];
+      root.querySelector('#lm-course-content').hidden = data[3];
+      root.querySelector('#lm-empty-course').hidden = !data[3];
+      show('course');
+    }));
+    const submitSearch = (query) => {
+      root.querySelector('#lm-search-input').value = query || 'three-subproblem multiplication';
+      show('search');
+      const empty = /quantum|banana|nonexistent|不存在/i.test(query || '');
+      root.querySelector('#lm-results-state').style.display = empty ? 'none' : 'block';
+      root.querySelector('#lm-no-results').style.display = empty ? 'block' : 'none';
+    };
+    root.querySelector('#lm-global-search').addEventListener('submit', (event) => { event.preventDefault(); submitSearch(event.currentTarget.querySelector('input').value); });
+    root.querySelector('#lm-header-search').addEventListener('submit', (event) => { event.preventDefault(); submitSearch(event.currentTarget.querySelector('input').value); });
+    root.querySelector('#lm-search-form').addEventListener('submit', (event) => { event.preventDefault(); submitSearch(root.querySelector('#lm-search-input').value); });
+    root.querySelectorAll('[data-example]').forEach((button) => button.addEventListener('click', () => submitSearch(button.dataset.example)));
+    root.querySelector('#lm-empty-clear').addEventListener('click', () => submitSearch('three-subproblem multiplication'));
+    root.querySelector('#lm-clear-filters').addEventListener('click', () => root.querySelectorAll('.lm-filters input').forEach((input) => { input.checked = false; }));
+    const previewData = [
+      ['Three-subproblem multiplication', 'Split the operands, compute three products, then combine.', 'Matched content: “reducing four recursive calls to three changes the exponent.”', 'CS 344 · Lecture 03 · Page 17'],
+      ['Karatsuba recurrence', 'T(n) = 3T(n/2) + O(n)', 'Matched content: “three subproblems give an exponent below two.”', 'CS 344 · Lecture 03 · Page 18'],
+      ['Divide-and-conquer template', 'Divide the input, solve smaller instances, and combine.', 'Matched content: “recursive subproblems and a linear combine step.”', 'CS 344 · Lecture 02 · Page 12']
+    ];
+    root.querySelectorAll('[data-result]').forEach((button) => button.addEventListener('click', () => {
+      root.querySelectorAll('[data-result]').forEach((item) => item.classList.remove('is-selected')); button.classList.add('is-selected');
+      const data = previewData[Number(button.dataset.result)];
+      root.querySelector('#lm-preview-title').textContent = data[0]; root.querySelector('#lm-preview-copy').textContent = data[1];
+      root.querySelector('#lm-preview-match').textContent = data[2]; root.querySelector('#lm-preview-meta').textContent = data[3];
+    }));
+    let slide = 17;
+    const slideTitles = {15:'Multiplication recurrence',16:'The divide-and-conquer pattern',17:'Three-subproblem multiplication',18:'Karatsuba recurrence',19:'Running-time comparison'};
+    const setSlide = (number) => {
+      slide = Math.max(15, Math.min(19, number));
+      root.querySelector('#lm-current-page').textContent = slide; root.querySelector('#lm-slide-label-number').textContent = slide;
+      root.querySelector('#lm-note-page').textContent = slide; root.querySelector('#lm-slide-title').textContent = slideTitles[slide];
+      root.querySelectorAll('.lm-thumb').forEach((thumb) => thumb.classList.toggle('is-selected', Number(thumb.dataset.slide) === slide));
+    };
+    root.querySelectorAll('.lm-thumb').forEach((thumb) => thumb.addEventListener('click', () => setSlide(Number(thumb.dataset.slide))));
+    root.querySelector('#lm-prev-slide').addEventListener('click', () => setSlide(slide - 1));
+    root.querySelector('#lm-next-slide').addEventListener('click', () => setSlide(slide + 1));
+    const reader = root.querySelector('#lm-reader'); const notePanel = root.querySelector('#lm-note-panel');
+    const toggleNotes = () => {
+      const collapsed = notePanel.classList.toggle('is-collapsed'); reader.classList.toggle('notes-collapsed', collapsed);
+      root.querySelector('#lm-collapse-notes').textContent = collapsed ? 'Show notes' : 'Hide notes';
+    };
+    root.querySelector('#lm-collapse-notes').addEventListener('click', toggleNotes); root.querySelector('#lm-panel-collapse').addEventListener('click', toggleNotes);
+    root.querySelectorAll('[data-mobile-view]').forEach((button) => button.addEventListener('click', () => {
+      root.querySelectorAll('[data-mobile-view]').forEach((item) => item.classList.toggle('is-active', item === button));
+      reader.classList.toggle('mobile-notes', button.dataset.mobileView === 'notes');
+    }));
+    const noteArea = root.querySelector('#lm-note-area'); const saveStatus = root.querySelector('#lm-save-status'); const retryWrap = root.querySelector('#lm-save-retry');
+    let saveTimer;
+    const runSave = (fail) => {
+      saveStatus.textContent = 'Saving…'; saveStatus.classList.remove('lm-save-error'); retryWrap.hidden = true;
+      setTimeout(() => {
+        if (fail) { saveStatus.textContent = 'Save failed — your text is still here'; saveStatus.classList.add('lm-save-error'); retryWrap.hidden = false; }
+        else { saveStatus.textContent = 'Saved just now'; saveStatus.classList.remove('lm-save-error'); retryWrap.hidden = true; }
+      }, 550);
+    };
+    noteArea.addEventListener('input', () => { saveStatus.textContent = 'Unsaved changes'; clearTimeout(saveTimer); saveTimer = setTimeout(() => runSave(false), 1000); });
+    root.querySelector('#lm-force-error').addEventListener('click', () => runSave(true)); root.querySelector('#lm-retry-save').addEventListener('click', () => runSave(false));
+    const details = {
+      upload:['Upload','The original PDF was copied and verified successfully.'],
+      render:['Render pages','18 slide images were generated. You can already inspect the rendered pages.'],
+      extract:['Extract content','Text content was found on 16 of 18 pages. Two visual-only pages are still searchable by image.'],
+      embed:['Generate vectors','Embedding stopped at page 14 because the model ran out of available memory. Pages 1–13 are preserved.'],
+      index:['Build index','The searchable index will be built after all vectors are available.']
+    };
+    root.querySelectorAll('.lm-stage').forEach((stage) => stage.addEventListener('click', () => {
+      root.querySelectorAll('.lm-stage').forEach((item) => item.classList.remove('is-selected')); stage.classList.add('is-selected');
+      const data = details[stage.dataset.stage]; root.querySelector('#lm-detail-title').textContent = data[0]; root.querySelector('#lm-detail-copy').textContent = data[1];
+    }));
+    root.querySelector('#lm-view-pages').addEventListener('click', () => { root.querySelector('#lm-detail-title').textContent = 'Generated pages'; root.querySelector('#lm-detail-copy').textContent = '13 pages are available now. Processing can resume without recreating them.'; });
+    root.querySelector('#lm-retry-stage').addEventListener('click', () => {
+      const embed = root.querySelector('#lm-embed-stage'); const index = root.querySelector('#lm-index-stage');
+      embed.classList.remove('is-failed'); root.querySelector('#lm-embed-status').textContent = 'Running'; root.querySelector('#lm-embed-sub').textContent = 'Continuing from page 14';
+      root.querySelector('#lm-retry-stage').style.display = 'none'; root.querySelector('#lm-detail-copy').textContent = 'Retrying with a smaller batch size. Completed pages are being reused.';
+      setTimeout(() => { embed.classList.add('is-done'); embed.querySelector('.lm-stage-index').textContent = '✓'; root.querySelector('#lm-embed-status').textContent = 'Complete'; root.querySelector('#lm-embed-sub').textContent = '18 page vectors generated'; index.classList.add('is-selected'); root.querySelector('#lm-index-status').textContent = 'Running'; root.querySelector('#lm-index-sub').textContent = 'Adding 18 pages'; }, 900);
+      setTimeout(() => { index.classList.add('is-done'); index.querySelector('.lm-stage-index').textContent = '✓'; root.querySelector('#lm-index-status').textContent = 'Complete'; root.querySelector('#lm-index-sub').textContent = 'Search index ready'; root.querySelector('#lm-upload-complete').style.display = 'block'; root.querySelector('#lm-detail-title').textContent = 'Processing complete'; root.querySelector('#lm-detail-copy').textContent = 'All 18 pages are ready to study and search.'; }, 1900);
+    });
+    root.querySelector('#lm-background').addEventListener('click', () => show('dashboard'));
+    root.querySelector('#lm-create-course').addEventListener('click', () => {
+      root.querySelector('#lm-course-name').textContent = 'Untitled course'; root.querySelector('#lm-course-description').textContent = 'New course · No lectures yet';
+      root.querySelector('#lm-course-color').style.background = '#8fa3a1'; root.querySelector('#lm-course-content').hidden = true; root.querySelector('#lm-empty-course').hidden = false; show('course');
+    });
+  })();
+</script>
