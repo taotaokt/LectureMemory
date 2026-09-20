@@ -110,15 +110,64 @@ ruff check .
 
 ### Optional Qwen embedding runtime
 
-The base installation stays lightweight. Install the local multimodal model runtime only on
-machines that will generate embeddings:
+The base installation stays lightweight. Users who want to generate embeddings should install
+the Qwen dependencies and create the local configuration with the following complete setup:
+
+```bash
+git clone https://github.com/taotaokt/LectureMemory.git
+cd LectureMemory
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[dev,qwen]'
+cp .env.example .env
+```
+
+If the base development environment is already installed, only this additional command is
+needed:
 
 ```bash
 python -m pip install -e '.[qwen]'
 ```
 
-The provider loads PyTorch and the model weights lazily on the first inference. With
-`DEVICE=auto`, it selects CUDA first, Apple MPS second, and CPU as a fallback.
+No separate model-download command, model URL, or Hugging Face token is required for the default
+public model. Keep these values in `.env` unless a different device or local model directory is
+needed:
+
+```dotenv
+DEVICE=auto
+MODEL_NAME=Qwen/Qwen3-VL-Embedding-2B
+EMBEDDING_DTYPE=auto
+EMBEDDING_DIMENSION=2048
+```
+
+Installing this optional runtime and downloading the default model require significant disk
+space:
+
+- `Qwen/Qwen3-VL-Embedding-2B` model weights occupy approximately **4 GiB**;
+- the Python model runtime and its dependencies may occupy approximately **1 GiB**;
+- keep at least **8 GiB of free disk space** available for the installation, download,
+  temporary files, and cache overhead.
+
+The model weights are **not bundled with this repository**. The provider loads PyTorch lazily
+and automatically downloads the model from Hugging Face on the first embedding inference. The
+first indexing or search operation can therefore take several minutes, depending on the network
+connection, before inference begins. A network connection is required for this initial download;
+after it completes, later runs reuse the cached files automatically.
+
+By default, Hugging Face stores the downloaded model in its shared user cache (commonly
+`~/.cache/huggingface/hub`) rather than under this repository. Set `HF_HOME` to choose a
+different cache location, or set `MODEL_NAME` to an already-downloaded local model directory for
+offline use. Model weights and Hugging Face caches are ignored by Git.
+
+If the automatic download fails, check that the machine has at least 8 GiB of free space, can
+reach Hugging Face, and has permission to write to the configured cache directory, then retry.
+An interrupted Hugging Face download can normally resume rather than restarting from zero.
+
+With `DEVICE=auto`, the provider selects CUDA first, Apple MPS second, and CPU as a fallback.
+CPU mode is supported, but embedding a large slide collection can be substantially slower;
+Apple Silicon or a CUDA-capable GPU is recommended.
 
 ```python
 from app.config import get_settings
@@ -139,10 +188,6 @@ query_vector = provider.embed_query("Where did we discuss convex sets?")
 slide_vector = provider.embed_image("data/rendered/course-1/lecture-3/page-001.png")
 similarity = float(query_vector @ slide_vector)
 ```
-
-The default model is downloaded from Hugging Face on first use. Set `MODEL_NAME` to a local
-model directory for an offline installation. Model weights and Hugging Face caches are ignored
-by Git.
 
 Embedding vectors are stored as atomic `.npy` files under `EMBEDDING_DIR`, while SQLite keeps
 the entity type and ID, model name, vector dimension, relative file path, content hash, and
