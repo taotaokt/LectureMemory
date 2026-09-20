@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.embeddings.base import EmbeddingProvider
-from app.models import Lecture, Note, SlidePage
+from app.models import Course, Lecture, Note, SlidePage
+from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.retrieval.index import FaissVectorIndex, VectorSearchResult
 from app.schemas import SearchResult
 
@@ -22,6 +23,10 @@ class RetrievalConfigurationError(RuntimeError):
     """Raised when the query provider and index cannot be used together."""
 
 
+class SearchFilterMismatchError(ValueError):
+    """Raised when a lecture filter does not belong to the selected course."""
+
+
 def search_lecture_memory(
     session: Session,
     query: str,
@@ -29,8 +34,10 @@ def search_lecture_memory(
     provider: EmbeddingProvider,
     index: FaissVectorIndex,
     top_k: int = DEFAULT_TOP_K,
+    course_id: int | None = None,
+    lecture_id: int | None = None,
 ) -> tuple[SearchResult, ...]:
-    """Embed a query and return normalized slide and note matches."""
+    """Embed a query and return normalized matches within an optional scope."""
     cleaned_query = _validate_query(query)
     _validate_top_k(top_k)
     if provider.dimension != index.dimension:
@@ -38,11 +45,18 @@ def search_lecture_memory(
             f"Embedding provider dimension {provider.dimension} does not match "
             f"index dimension {index.dimension}"
         )
+    _validate_search_scope(
+        session,
+        course_id=course_id,
+        lecture_id=lecture_id,
+    )
     if index.count == 0:
         return ()
 
     query_vector = provider.embed_query(cleaned_query)
-    candidates = index.search(query_vector, top_k=top_k)
+    has_filter = course_id is not None or lecture_id is not None
+    candidate_limit = index.count if has_filter else top_k
+    candidates = index.search(query_vector, top_k=candidate_limit)
     results: list[SearchResult] = []
     for candidate in candidates:
         result = _resolve_candidate(session, candidate, rank=len(results) + 1)
@@ -56,7 +70,11 @@ def search_lecture_memory(
                 },
             )
             continue
+        if not _matches_scope(result, course_id=course_id, lecture_id=lecture_id):
+            continue
         results.append(result)
+        if len(results) == top_k:
+            break
     return tuple(results)
 
 
@@ -172,3 +190,43 @@ def _validate_query(query: str) -> str:
 def _validate_top_k(top_k: int) -> None:
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
+
+
+def _validate_search_scope(
+    session: Session,
+    *,
+    course_id: int | None,
+    lecture_id: int | None,
+) -> None:
+    _validate_optional_id(course_id, field_name="course_id")
+    _validate_optional_id(lecture_id, field_name="lecture_id")
+
+    course = session.get(Course, course_id) if course_id is not None else None
+    if course_id is not None and course is None:
+        raise CourseNotFoundError(f"Course {course_id} does not exist")
+
+    lecture = session.get(Lecture, lecture_id) if lecture_id is not None else None
+    if lecture_id is not None and lecture is None:
+        raise LectureNotFoundError(f"Lecture {lecture_id} does not exist")
+    if course_id is not None and lecture is not None and lecture.course_id != course_id:
+        raise SearchFilterMismatchError(
+            f"Lecture {lecture.id} belongs to course {lecture.course_id}, not {course_id}"
+        )
+
+
+def _validate_optional_id(value: int | None, *, field_name: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{field_name} must be a positive integer or None")
+
+
+def _matches_scope(
+    result: SearchResult,
+    *,
+    course_id: int | None,
+    lecture_id: int | None,
+) -> bool:
+    if course_id is not None and result.course_id != course_id:
+        return False
+    return lecture_id is None or result.lecture_id == lecture_id

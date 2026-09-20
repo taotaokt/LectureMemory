@@ -15,6 +15,7 @@ from app.database import (
 )
 from app.embeddings.base import EmbeddingProvider, RawEmbedding
 from app.repositories.course_repository import create_course
+from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.repositories.lecture_repository import create_lecture
 from app.repositories.note_repository import create_note
 from app.repositories.slide_page_repository import create_slide_page
@@ -22,6 +23,7 @@ from app.retrieval import (
     FaissVectorIndex,
     IndexedEntity,
     RetrievalConfigurationError,
+    SearchFilterMismatchError,
     search_lecture_memory,
 )
 from app.schemas import CourseCreate, LectureCreate, NoteCreate, SlidePageCreate
@@ -109,6 +111,90 @@ def create_search_fixture(factory: sessionmaker[Session]) -> dict[str, int]:
             "attached_note": attached_note.id,
             "lecture_note": lecture_note.id,
         }
+
+
+def create_filter_fixture(factory: sessionmaker[Session]) -> dict[str, int]:
+    with session_scope(factory) as session:
+        algorithms = create_course(
+            session,
+            CourseCreate(name="Algorithms", code="CS344"),
+        )
+        machine_learning = create_course(
+            session,
+            CourseCreate(name="Machine Learning", code="CS446"),
+        )
+        algorithms_lecture = create_lecture(
+            session,
+            algorithms.id,
+            LectureCreate(title="Divide and Conquer", lecture_number=3),
+        )
+        pca_lecture = create_lecture(
+            session,
+            machine_learning.id,
+            LectureCreate(title="Principal Component Analysis", lecture_number=7),
+        )
+        svm_lecture = create_lecture(
+            session,
+            machine_learning.id,
+            LectureCreate(title="Support Vector Machines", lecture_number=8),
+        )
+        algorithms_page = create_slide_page(
+            session,
+            algorithms_lecture.id,
+            SlidePageCreate(page_number=1, image_path="/algorithms/page-1.png"),
+        )
+        algorithms_note = create_note(
+            session,
+            algorithms_lecture.id,
+            NoteCreate(content="Algorithm note"),
+        )
+        pca_page = create_slide_page(
+            session,
+            pca_lecture.id,
+            SlidePageCreate(page_number=4, image_path="/ml/pca-4.png"),
+        )
+        pca_note = create_note(
+            session,
+            pca_lecture.id,
+            NoteCreate(content="PCA note", page_id=pca_page.id),
+        )
+        svm_page = create_slide_page(
+            session,
+            svm_lecture.id,
+            SlidePageCreate(page_number=2, image_path="/ml/svm-2.png"),
+        )
+        return {
+            "algorithms_course": algorithms.id,
+            "ml_course": machine_learning.id,
+            "algorithms_lecture": algorithms_lecture.id,
+            "pca_lecture": pca_lecture.id,
+            "svm_lecture": svm_lecture.id,
+            "algorithms_page": algorithms_page.id,
+            "algorithms_note": algorithms_note.id,
+            "pca_page": pca_page.id,
+            "pca_note": pca_note.id,
+            "svm_page": svm_page.id,
+        }
+
+
+def build_filter_index(ids: dict[str, int]) -> FaissVectorIndex:
+    return FaissVectorIndex.build(
+        dimension=3,
+        vectors=[
+            [1.0, 0.0, 0.0],
+            [0.97, 0.24, 0.0],
+            [0.93, 0.37, 0.0],
+            [0.88, 0.48, 0.0],
+            [0.80, 0.60, 0.0],
+        ],
+        entities=[
+            IndexedEntity("slide_page", ids["algorithms_page"]),
+            IndexedEntity("slide_page", ids["pca_page"]),
+            IndexedEntity("note", ids["algorithms_note"]),
+            IndexedEntity("note", ids["pca_note"]),
+            IndexedEntity("slide_page", ids["svm_page"]),
+        ],
+    )
 
 
 def test_search_returns_normalized_mixed_results_in_similarity_order(
@@ -238,6 +324,146 @@ def test_empty_index_returns_without_loading_query_model(
         )
 
     assert results == ()
+    assert provider.query_calls == []
+
+
+def test_course_filter_excludes_higher_scoring_other_course_and_fills_top_k(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+
+    with retrieval_session_factory() as session:
+        results = search_lecture_memory(
+            session,
+            "dimensionality reduction",
+            provider=QueryEmbeddingProvider(),
+            index=build_filter_index(ids),
+            course_id=ids["ml_course"],
+            top_k=2,
+        )
+
+    assert len(results) == 2
+    assert [result.entity_id for result in results] == [ids["pca_page"], ids["pca_note"]]
+    assert [result.rank for result in results] == [1, 2]
+    assert {result.course_id for result in results} == {ids["ml_course"]}
+
+
+def test_lecture_filter_returns_only_selected_lecture(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+
+    with retrieval_session_factory() as session:
+        results = search_lecture_memory(
+            session,
+            "PCA",
+            provider=QueryEmbeddingProvider(),
+            index=build_filter_index(ids),
+            lecture_id=ids["pca_lecture"],
+            top_k=10,
+        )
+
+    assert [result.entity_id for result in results] == [ids["pca_page"], ids["pca_note"]]
+    assert {result.lecture_id for result in results} == {ids["pca_lecture"]}
+
+
+def test_matching_course_and_lecture_filters_can_be_combined(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+
+    with retrieval_session_factory() as session:
+        results = search_lecture_memory(
+            session,
+            "support vectors",
+            provider=QueryEmbeddingProvider(),
+            index=build_filter_index(ids),
+            course_id=ids["ml_course"],
+            lecture_id=ids["svm_lecture"],
+        )
+
+    assert len(results) == 1
+    assert results[0].entity_id == ids["svm_page"]
+    assert results[0].course_id == ids["ml_course"]
+    assert results[0].lecture_id == ids["svm_lecture"]
+
+
+def test_valid_filter_with_no_indexed_entities_returns_empty_results(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0]],
+        entities=[IndexedEntity("slide_page", ids["algorithms_page"])],
+    )
+    provider = QueryEmbeddingProvider()
+
+    with retrieval_session_factory() as session:
+        results = search_lecture_memory(
+            session,
+            "SVM",
+            provider=provider,
+            index=index,
+            lecture_id=ids["svm_lecture"],
+        )
+
+    assert results == ()
+    assert provider.query_calls == ["SVM"]
+
+
+def test_mismatched_course_and_lecture_filters_are_rejected_before_inference(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+    provider = QueryEmbeddingProvider()
+
+    with retrieval_session_factory() as session:
+        with pytest.raises(SearchFilterMismatchError, match="belongs to course"):
+            search_lecture_memory(
+                session,
+                "PCA",
+                provider=provider,
+                index=build_filter_index(ids),
+                course_id=ids["algorithms_course"],
+                lecture_id=ids["pca_lecture"],
+            )
+
+    assert provider.query_calls == []
+
+
+@pytest.mark.parametrize(
+    ("course_id", "lecture_id", "error_type", "message"),
+    [
+        (999, None, CourseNotFoundError, "Course 999 does not exist"),
+        (None, 999, LectureNotFoundError, "Lecture 999 does not exist"),
+        (0, None, ValueError, "course_id"),
+        (True, None, ValueError, "course_id"),
+        (None, -1, ValueError, "lecture_id"),
+        (None, False, ValueError, "lecture_id"),
+    ],
+)
+def test_invalid_search_scope_is_rejected_before_inference(
+    course_id: object,
+    lecture_id: object,
+    error_type: type[Exception],
+    message: str,
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    create_filter_fixture(retrieval_session_factory)
+    provider = QueryEmbeddingProvider()
+
+    with retrieval_session_factory() as session:
+        with pytest.raises(error_type, match=message):
+            search_lecture_memory(
+                session,
+                "valid query",
+                provider=provider,
+                index=FaissVectorIndex(3),
+                course_id=course_id,  # type: ignore[arg-type]
+                lecture_id=lecture_id,  # type: ignore[arg-type]
+            )
+
     assert provider.query_calls == []
 
 

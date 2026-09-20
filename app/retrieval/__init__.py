@@ -12,6 +12,7 @@ from app.retrieval.index import (
 from app.retrieval.service import (
     DEFAULT_TOP_K,
     RetrievalConfigurationError,
+    SearchFilterMismatchError,
     search_lecture_memory,
 )
 
@@ -23,6 +24,7 @@ __all__ = [
     "IndexPersistenceError",
     "InvalidVectorError",
     "RetrievalConfigurationError",
+    "SearchFilterMismatchError",
     "VectorIndexError",
     "VectorSearchResult",
     "search_lecture_memory",
