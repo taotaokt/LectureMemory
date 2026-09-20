@@ -146,3 +146,29 @@ class EmbeddingRecordRead(BaseModel):
     embedding_path: str
     content_hash: str
     created_at: datetime
+
+
+SearchResultType = Literal["slide", "note"]
+
+
+class SearchResult(BaseModel):
+    """Normalized slide or note match returned by the retrieval layer."""
+
+    model_config = ConfigDict(frozen=True)
+
+    result_type: SearchResultType
+    entity_id: int = Field(gt=0)
+    rank: int = Field(gt=0)
+    course_id: int = Field(gt=0)
+    course_name: str
+    course_code: str
+    lecture_id: int = Field(gt=0)
+    lecture_title: str
+    lecture_number: int = Field(gt=0)
+    page_number: int | None = Field(default=None, gt=0)
+    preview_path: str | None = None
+    raw_similarity: float
+    reranker_score: float | None = None
+    text_preview: str | None = None
+    related_notes: tuple[str, ...] = ()
+    concepts: tuple[str, ...] = ()

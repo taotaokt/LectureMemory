@@ -2,7 +2,7 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion, slide and note embedding, and the FAISS index foundation are available; unified retrieval and the user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, and unified slide/note retrieval are available; search filtering and the user interface are planned but not yet available.
 
 ## Why Lecture Memory?
 
@@ -84,7 +84,8 @@ Planned core stack:
 - [x] Lecture slide-page embedding pipeline with per-page failure isolation
 - [x] Lecture note-text embedding pipeline with per-note failure isolation
 - [x] Persistent FAISS vector index abstraction with entity mapping
-- [ ] Vector retrieval and filtering
+- [x] Unified slide and note vector retrieval
+- [ ] Course and lecture search filtering
 - [ ] Multimodal reranking
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
@@ -203,6 +204,11 @@ so the remaining slides or notes can still be indexed.
 rest of the application. It supports building and incrementally adding mixed slide-page and note
 vectors, mapping matches back to domain entities, and saving or loading validated index snapshots
 under `INDEX_DIR`.
+
+`search_lecture_memory` embeds a natural-language query, searches the shared vector index, and
+returns normalized `SearchResult` objects for both slides and notes. Results include course and
+lecture context, optional page and preview information, text previews, related slide notes, and
+the raw similarity score without exposing FAISS or database models to the frontend.
 
 ## Planned Retrieval Evaluation
 
