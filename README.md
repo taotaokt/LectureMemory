@@ -2,7 +2,7 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, and filtered slide/note retrieval are available; reranking and the user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, filtered retrieval, and the reranker abstraction are available; production reranking and the user interface are planned but not yet available.
 
 ## Why Lecture Memory?
 
@@ -86,7 +86,8 @@ Planned core stack:
 - [x] Persistent FAISS vector index abstraction with entity mapping
 - [x] Unified slide and note vector retrieval
 - [x] Course and lecture search filtering
-- [ ] Multimodal reranking
+- [x] Model-independent reranker interface
+- [ ] Qwen3-VL multimodal reranking
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
 
@@ -211,6 +212,10 @@ lecture context, optional page and preview information, text previews, related s
 the raw similarity score without exposing FAISS or database models to the frontend. Optional
 `course_id` and `lecture_id` filters restrict the candidate scope before the final `top_k` results
 are returned.
+
+The `Reranker` abstraction accepts a query and normalized search candidates, validates one score
+per candidate, applies stable score ordering, and returns immutable results with updated ranks and
+`reranker_score` values. The original `raw_similarity` remains available for evaluation.
 
 ## Planned Retrieval Evaluation
 

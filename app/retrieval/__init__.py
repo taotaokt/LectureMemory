@@ -9,6 +9,12 @@ from app.retrieval.index import (
     VectorIndexError,
     VectorSearchResult,
 )
+from app.retrieval.reranker import (
+    InvalidRerankerOutputError,
+    RawRerankerScores,
+    Reranker,
+    RerankerError,
+)
 from app.retrieval.service import (
     DEFAULT_TOP_K,
     RetrievalConfigurationError,
@@ -22,7 +28,11 @@ __all__ = [
     "FaissVectorIndex",
     "IndexedEntity",
     "IndexPersistenceError",
+    "InvalidRerankerOutputError",
     "InvalidVectorError",
+    "RawRerankerScores",
+    "Reranker",
+    "RerankerError",
     "RetrievalConfigurationError",
     "SearchFilterMismatchError",
     "VectorIndexError",
