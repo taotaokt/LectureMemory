@@ -2,7 +2,9 @@
 
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
-> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding, persistent indexing, and filtered slide/note retrieval are available; reranking and the user interface are planned but not yet available.
+> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
+> persistent indexing, filtered retrieval, the configured Qwen reranking workflow, and local
+> concept extraction and display data are available; the interactive user interface is planned.
 
 ## Why Lecture Memory?
 
@@ -86,7 +88,12 @@ Planned core stack:
 - [x] Persistent FAISS vector index abstraction with entity mapping
 - [x] Unified slide and note vector retrieval
 - [x] Course and lecture search filtering
-- [ ] Multimodal reranking
+- [x] Model-independent reranker interface
+- [x] Qwen3-VL multimodal reranker adapter
+- [x] Configured retrieval-to-rerank workflow
+- [x] Preserved embedding similarity and reranker scores
+- [x] Normalized lecture concept extraction and persistence
+- [x] Concept display data for lectures and search results
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
 
@@ -144,6 +151,10 @@ DEVICE=auto
 MODEL_NAME=Qwen/Qwen3-VL-Embedding-2B
 EMBEDDING_DTYPE=auto
 EMBEDDING_DIMENSION=2048
+RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
+RETRIEVAL_TOP_K=20
+RERANK_TOP_K=20
+FINAL_TOP_K=5
 ```
 
 Installing this optional runtime and downloading the default model require significant disk
@@ -211,6 +222,70 @@ lecture context, optional page and preview information, text previews, related s
 the raw similarity score without exposing FAISS or database models to the frontend. Optional
 `course_id` and `lecture_id` filters restrict the candidate scope before the final `top_k` results
 are returned.
+
+The `Reranker` abstraction accepts a query and normalized search candidates, validates one score
+per candidate, applies stable score ordering, and returns immutable results with updated ranks and
+`reranker_score` values. The original `raw_similarity` remains available for evaluation.
+
+`Qwen3VLReranker` implements that interface with lazy model loading and CUDA, Apple MPS, or CPU
+execution. Slide candidates use the rendered image together with extracted text when available;
+note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
+
+`search_and_rerank` connects the complete query path. By default it retrieves 20 vector-search
+candidates, sends up to 20 candidates to the reranker, and returns the best 5. Course and lecture
+filters are applied before reranking, empty indexes avoid loading either model, and configuration
+requires `FINAL_TOP_K <= RERANK_TOP_K <= RETRIEVAL_TOP_K`.
+
+```python
+from app.config import get_settings
+from app.retrieval import Qwen3VLReranker, search_and_rerank
+
+settings = get_settings()
+reranker = Qwen3VLReranker(
+    model_name=settings.reranker_model_name,
+    device=settings.device,
+    dtype=settings.reranker_dtype,
+    batch_size=settings.reranker_batch_size,
+    max_length=settings.reranker_max_length,
+    min_pixels=settings.reranker_min_pixels,
+    max_pixels=settings.reranker_max_pixels,
+    instruction=settings.reranker_instruction,
+)
+
+results = search_and_rerank(
+    session,
+    "Where did we discuss convex sets?",
+    provider=provider,
+    index=index,
+    reranker=reranker,
+    retrieval_top_k=settings.retrieval_top_k,
+    rerank_top_k=settings.rerank_top_k,
+    final_top_k=settings.final_top_k,
+)
+```
+
+`RuleBasedConceptExtractor` provides a lightweight initial concept extractor without requiring
+another model download. It combines the lecture title, extracted slide text, and personal notes;
+normalizes concept names for deduplication; and stores confidence-scored `auto_extracted`
+associations. Re-extraction replaces earlier automatic associations while retaining concepts
+added with the `manual` source. The extractor is intentionally replaceable so a future model-based
+implementation can use the same persistence workflow.
+
+```python
+from app.concepts import RuleBasedConceptExtractor
+from app.services.concept_service import extract_lecture_concepts
+
+summary = extract_lecture_concepts(
+    session,
+    lecture_id,
+    extractor=RuleBasedConceptExtractor(max_concepts=12),
+)
+```
+
+`get_lecture_concept_display` returns ordered, serializable concept metadata for a lecture.
+Unified slide and note `SearchResult` objects also include the lecture's ordered concept names,
+and reranking preserves that display metadata together with both relevance scores. Streamlit can
+consume these objects directly without accessing database associations.
 
 ## Planned Retrieval Evaluation
 

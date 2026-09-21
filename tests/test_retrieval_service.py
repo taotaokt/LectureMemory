@@ -14,6 +14,10 @@ from app.database import (
     session_scope,
 )
 from app.embeddings.base import EmbeddingProvider, RawEmbedding
+from app.repositories.concept_repository import (
+    assign_lecture_concept,
+    get_or_create_concept,
+)
 from app.repositories.course_repository import create_course
 from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.repositories.lecture_repository import create_lecture
@@ -22,11 +26,13 @@ from app.repositories.slide_page_repository import create_slide_page
 from app.retrieval import (
     FaissVectorIndex,
     IndexedEntity,
+    Reranker,
     RetrievalConfigurationError,
     SearchFilterMismatchError,
+    search_and_rerank,
     search_lecture_memory,
 )
-from app.schemas import CourseCreate, LectureCreate, NoteCreate, SlidePageCreate
+from app.schemas import CourseCreate, LectureCreate, NoteCreate, SearchResult, SlidePageCreate
 
 
 class QueryEmbeddingProvider(EmbeddingProvider):
@@ -53,6 +59,26 @@ class QueryEmbeddingProvider(EmbeddingProvider):
     def _embed_query(self, query: str) -> RawEmbedding:
         self.query_calls.append(query)
         return [1.0] + [0.0] * (self.dimension - 1)
+
+
+class RecordingReranker(Reranker):
+    """Deterministic reranker used to observe pipeline boundaries."""
+
+    def __init__(self, scores: list[float]) -> None:
+        self.scores = scores
+        self.calls: list[tuple[str, tuple[SearchResult, ...]]] = []
+
+    @property
+    def model_name(self) -> str:
+        return "test/recording-reranker"
+
+    def _score(
+        self,
+        query: str,
+        candidates: tuple[SearchResult, ...],
+    ) -> list[float]:
+        self.calls.append((query, candidates))
+        return self.scores[: len(candidates)]
 
 
 @pytest.fixture
@@ -106,6 +132,7 @@ def create_search_fixture(factory: sessionmaker[Session]) -> dict[str, int]:
             NoteCreate(content="Compare against ordinary multiplication."),
         )
         return {
+            "lecture": lecture.id,
             "first_page": first_page.id,
             "second_page": second_page.id,
             "attached_note": attached_note.id,
@@ -256,6 +283,191 @@ def test_search_returns_normalized_mixed_results_in_similarity_order(
     assert note.raw_similarity == pytest.approx(0.8)
     assert note.text_preview == "Karatsuba uses three subproblems."
     assert note.related_notes == ()
+
+
+def test_search_and_rerank_exposes_lecture_concepts_for_slides_and_notes(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    with session_scope(retrieval_session_factory) as session:
+        master_theorem, _ = get_or_create_concept(
+            session,
+            name="Master Theorem",
+            normalized_name="master theorem",
+        )
+        divide_and_conquer, _ = get_or_create_concept(
+            session,
+            name="Divide and Conquer",
+            normalized_name="divide and conquer",
+        )
+        assign_lecture_concept(
+            session,
+            lecture_id=ids["lecture"],
+            concept_id=master_theorem.id,
+            confidence=0.8,
+            source="auto_extracted",
+        )
+        assign_lecture_concept(
+            session,
+            lecture_id=ids["lecture"],
+            concept_id=divide_and_conquer.id,
+            confidence=1.0,
+            source="manual",
+        )
+
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0], [0.8, 0.6, 0.0]],
+        entities=[
+            IndexedEntity("slide_page", ids["first_page"]),
+            IndexedEntity("note", ids["attached_note"]),
+        ],
+    )
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "recursive multiplication",
+            provider=QueryEmbeddingProvider(),
+            index=index,
+            reranker=RecordingReranker([0.4, 0.9]),
+            retrieval_top_k=2,
+            rerank_top_k=2,
+            final_top_k=2,
+        )
+
+    assert [result.result_type for result in results] == ["note", "slide"]
+    assert all(
+        result.concepts == ("Divide and Conquer", "Master Theorem")
+        for result in results
+    )
+
+
+def test_search_and_rerank_applies_each_top_k_stage(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[
+            [1.0, 0.0, 0.0],
+            [0.8, 0.6, 0.0],
+            [0.6, 0.8, 0.0],
+            [0.4, 0.9, 0.0],
+        ],
+        entities=[
+            IndexedEntity("slide_page", ids["first_page"]),
+            IndexedEntity("note", ids["attached_note"]),
+            IndexedEntity("slide_page", ids["second_page"]),
+            IndexedEntity("note", ids["lecture_note"]),
+        ],
+    )
+    reranker = RecordingReranker([0.1, 0.9, 0.4])
+
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "  Karatsuba explanation  ",
+            provider=QueryEmbeddingProvider(),
+            index=index,
+            reranker=reranker,
+            retrieval_top_k=4,
+            rerank_top_k=3,
+            final_top_k=2,
+        )
+
+    assert len(reranker.calls) == 1
+    reranker_query, candidates = reranker.calls[0]
+    assert reranker_query == "Karatsuba explanation"
+    assert [(item.result_type, item.entity_id) for item in candidates] == [
+        ("slide", ids["first_page"]),
+        ("note", ids["attached_note"]),
+        ("slide", ids["second_page"]),
+    ]
+    assert [(item.result_type, item.entity_id) for item in results] == [
+        ("note", ids["attached_note"]),
+        ("slide", ids["second_page"]),
+    ]
+    assert [item.rank for item in results] == [1, 2]
+    assert [item.reranker_score for item in results] == pytest.approx([0.9, 0.4])
+    assert [item.raw_similarity for item in results] == pytest.approx([0.8, 0.6])
+
+
+def test_search_and_rerank_applies_filters_before_reranking(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_filter_fixture(retrieval_session_factory)
+    reranker = RecordingReranker([0.2, 0.8])
+
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "PCA notes",
+            provider=QueryEmbeddingProvider(),
+            index=build_filter_index(ids),
+            reranker=reranker,
+            retrieval_top_k=3,
+            rerank_top_k=2,
+            final_top_k=2,
+            course_id=ids["ml_course"],
+        )
+
+    _, candidates = reranker.calls[0]
+    assert [item.entity_id for item in candidates] == [ids["pca_page"], ids["pca_note"]]
+    assert [item.entity_id for item in results] == [ids["pca_note"], ids["pca_page"]]
+    assert {item.course_id for item in results} == {ids["ml_course"]}
+
+
+def test_search_and_rerank_empty_index_skips_both_models(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    provider = QueryEmbeddingProvider()
+    reranker = RecordingReranker([])
+
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "valid query",
+            provider=provider,
+            index=FaissVectorIndex(3),
+            reranker=reranker,
+        )
+
+    assert results == ()
+    assert provider.query_calls == []
+    assert reranker.calls == []
+
+
+@pytest.mark.parametrize(
+    ("limits", "message"),
+    [
+        ({"retrieval_top_k": 0}, "retrieval_top_k"),
+        ({"rerank_top_k": True}, "rerank_top_k"),
+        ({"final_top_k": -1}, "final_top_k"),
+        ({"retrieval_top_k": 2, "rerank_top_k": 3}, "rerank_top_k"),
+        ({"rerank_top_k": 2, "final_top_k": 3}, "final_top_k"),
+    ],
+)
+def test_search_and_rerank_rejects_invalid_limits_before_inference(
+    limits: dict[str, int],
+    message: str,
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    provider = QueryEmbeddingProvider()
+    reranker = RecordingReranker([])
+
+    with retrieval_session_factory() as session:
+        with pytest.raises(ValueError, match=message):
+            search_and_rerank(
+                session,
+                "valid query",
+                provider=provider,
+                index=FaissVectorIndex(3),
+                reranker=reranker,
+                **limits,
+            )
+
+    assert provider.query_calls == []
+    assert reranker.calls == []
 
 
 def test_lecture_level_note_has_no_page_preview(

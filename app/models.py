@@ -2,7 +2,16 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -76,6 +85,11 @@ class Lecture(Base):
         passive_deletes=True,
     )
     notes: Mapped[list["Note"]] = relationship(
+        back_populates="lecture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    concept_associations: Mapped[list["LectureConcept"]] = relationship(
         back_populates="lecture",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -156,6 +170,77 @@ class Note(Base):
 
     def __repr__(self) -> str:
         return f"Note(id={self.id!r}, lecture_id={self.lecture_id!r}, page_id={self.page_id!r})"
+
+
+class Concept(Base):
+    """A canonical concept shared by one or more lectures."""
+
+    __tablename__ = "concepts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    lecture_associations: Mapped[list["LectureConcept"]] = relationship(
+        back_populates="concept",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"Concept(id={self.id!r}, name={self.name!r}, "
+            f"normalized_name={self.normalized_name!r})"
+        )
+
+
+class LectureConcept(Base):
+    """A scored, sourced association between a lecture and a concept."""
+
+    __tablename__ = "lecture_concepts"
+    __table_args__ = (
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_lecture_concept_confidence",
+        ),
+        CheckConstraint(
+            "source IN ('slides', 'notes', 'auto_extracted', 'manual')",
+            name="ck_lecture_concept_source",
+        ),
+    )
+
+    lecture_id: Mapped[int] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    concept_id: Mapped[int] = mapped_column(
+        ForeignKey("concepts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    lecture: Mapped[Lecture] = relationship(back_populates="concept_associations")
+    concept: Mapped[Concept] = relationship(back_populates="lecture_associations")
+
+    def __repr__(self) -> str:
+        return (
+            f"LectureConcept(lecture_id={self.lecture_id!r}, "
+            f"concept_id={self.concept_id!r}, source={self.source!r})"
+        )
 
 
 class EmbeddingRecord(Base):

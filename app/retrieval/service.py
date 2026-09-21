@@ -9,13 +9,18 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.embeddings.base import EmbeddingProvider
 from app.models import Course, Lecture, Note, SlidePage
+from app.repositories.concept_repository import list_lecture_concepts
 from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.retrieval.index import FaissVectorIndex, VectorSearchResult
+from app.retrieval.reranker import Reranker
 from app.schemas import SearchResult
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 10
+DEFAULT_RETRIEVAL_TOP_K = 20
+DEFAULT_RERANK_TOP_K = 20
+DEFAULT_FINAL_TOP_K = 5
 DEFAULT_PREVIEW_LENGTH = 240
 
 
@@ -58,8 +63,14 @@ def search_lecture_memory(
     candidate_limit = index.count if has_filter else top_k
     candidates = index.search(query_vector, top_k=candidate_limit)
     results: list[SearchResult] = []
+    concept_cache: dict[int, tuple[str, ...]] = {}
     for candidate in candidates:
-        result = _resolve_candidate(session, candidate, rank=len(results) + 1)
+        result = _resolve_candidate(
+            session,
+            candidate,
+            rank=len(results) + 1,
+            concept_cache=concept_cache,
+        )
         if result is None:
             logger.warning(
                 "Skipping stale vector-index entity",
@@ -78,15 +89,75 @@ def search_lecture_memory(
     return tuple(results)
 
 
+def search_and_rerank(
+    session: Session,
+    query: str,
+    *,
+    provider: EmbeddingProvider,
+    index: FaissVectorIndex,
+    reranker: Reranker,
+    retrieval_top_k: int = DEFAULT_RETRIEVAL_TOP_K,
+    rerank_top_k: int = DEFAULT_RERANK_TOP_K,
+    final_top_k: int = DEFAULT_FINAL_TOP_K,
+    course_id: int | None = None,
+    lecture_id: int | None = None,
+) -> tuple[SearchResult, ...]:
+    """Retrieve a broad candidate set, rerank it, and return final results."""
+    cleaned_query = _validate_query(query)
+    _validate_pipeline_limits(
+        retrieval_top_k=retrieval_top_k,
+        rerank_top_k=rerank_top_k,
+        final_top_k=final_top_k,
+    )
+    retrieved = search_lecture_memory(
+        session,
+        cleaned_query,
+        provider=provider,
+        index=index,
+        top_k=retrieval_top_k,
+        course_id=course_id,
+        lecture_id=lecture_id,
+    )
+    if not retrieved:
+        return ()
+
+    rerank_candidates = retrieved[:rerank_top_k]
+    results = reranker.rerank(
+        cleaned_query,
+        rerank_candidates,
+        top_k=final_top_k,
+    )
+    logger.info(
+        "Completed retrieval and reranking",
+        extra={
+            "retrieved_count": len(retrieved),
+            "reranked_count": len(rerank_candidates),
+            "returned_count": len(results),
+        },
+    )
+    return results
+
+
 def _resolve_candidate(
     session: Session,
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     if candidate.entity_type == "slide_page":
-        return _resolve_slide_result(session, candidate, rank=rank)
-    return _resolve_note_result(session, candidate, rank=rank)
+        return _resolve_slide_result(
+            session,
+            candidate,
+            rank=rank,
+            concept_cache=concept_cache,
+        )
+    return _resolve_note_result(
+        session,
+        candidate,
+        rank=rank,
+        concept_cache=concept_cache,
+    )
 
 
 def _resolve_slide_result(
@@ -94,6 +165,7 @@ def _resolve_slide_result(
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     statement = (
         select(SlidePage)
@@ -127,6 +199,7 @@ def _resolve_slide_result(
         raw_similarity=candidate.score,
         text_preview=_text_preview(page.text_content),
         related_notes=related_notes,
+        concepts=_lecture_concept_names(session, lecture.id, concept_cache),
     )
 
 
@@ -135,6 +208,7 @@ def _resolve_note_result(
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     statement = (
         select(Note)
@@ -164,7 +238,23 @@ def _resolve_note_result(
         preview_path=note.page.image_path if note.page is not None else None,
         raw_similarity=candidate.score,
         text_preview=_text_preview(note.content),
+        concepts=_lecture_concept_names(session, lecture.id, concept_cache),
     )
+
+
+def _lecture_concept_names(
+    session: Session,
+    lecture_id: int,
+    cache: dict[int, tuple[str, ...]],
+) -> tuple[str, ...]:
+    concepts = cache.get(lecture_id)
+    if concepts is None:
+        concepts = tuple(
+            association.concept.name
+            for association in list_lecture_concepts(session, lecture_id)
+        )
+        cache[lecture_id] = concepts
+    return concepts
 
 
 def _text_preview(content: str | None) -> str | None:
@@ -190,6 +280,25 @@ def _validate_query(query: str) -> str:
 def _validate_top_k(top_k: int) -> None:
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
+
+
+def _validate_pipeline_limits(
+    *,
+    retrieval_top_k: int,
+    rerank_top_k: int,
+    final_top_k: int,
+) -> None:
+    for field_name, value in (
+        ("retrieval_top_k", retrieval_top_k),
+        ("rerank_top_k", rerank_top_k),
+        ("final_top_k", final_top_k),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"{field_name} must be a positive integer")
+    if rerank_top_k > retrieval_top_k:
+        raise ValueError("rerank_top_k must not exceed retrieval_top_k")
+    if final_top_k > rerank_top_k:
+        raise ValueError("final_top_k must not exceed rerank_top_k")
 
 
 def _validate_search_scope(

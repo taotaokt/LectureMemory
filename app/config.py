@@ -61,13 +61,69 @@ class Settings(BaseSettings):
         validation_alias="EMBEDDING_QUERY_INSTRUCTION",
     )
     reranker_model_name: str = Field(
-        default="Qwen3-VL-Reranker",
+        default="Qwen/Qwen3-VL-Reranker-2B",
         validation_alias="RERANKER_MODEL_NAME",
+    )
+    reranker_dtype: Literal["auto", "float16", "bfloat16", "float32"] = Field(
+        default="auto",
+        validation_alias="RERANKER_DTYPE",
+    )
+    reranker_batch_size: int = Field(
+        default=1,
+        ge=1,
+        validation_alias="RERANKER_BATCH_SIZE",
+    )
+    reranker_max_length: int = Field(
+        default=10_240,
+        ge=1,
+        validation_alias="RERANKER_MAX_LENGTH",
+    )
+    reranker_min_pixels: int = Field(
+        default=4 * 32 * 32,
+        ge=1,
+        validation_alias="RERANKER_MIN_PIXELS",
+    )
+    reranker_max_pixels: int = Field(
+        default=512 * 32 * 32,
+        ge=1,
+        validation_alias="RERANKER_MAX_PIXELS",
+    )
+    reranker_instruction: str = Field(
+        default=(
+            "Retrieve the lecture slide image or note most relevant to the user's query."
+        ),
+        min_length=1,
+        validation_alias="RERANKER_INSTRUCTION",
+    )
+    retrieval_top_k: int = Field(
+        default=20,
+        ge=1,
+        validation_alias="RETRIEVAL_TOP_K",
+    )
+    rerank_top_k: int = Field(
+        default=20,
+        ge=1,
+        validation_alias="RERANK_TOP_K",
+    )
+    final_top_k: int = Field(
+        default=5,
+        ge=1,
+        validation_alias="FINAL_TOP_K",
     )
 
     @model_validator(mode="after")
     def resolve_storage_paths(self) -> Self:
         """Resolve storage paths and derive unset child paths from ``data_dir``."""
+        if self.reranker_max_pixels < self.reranker_min_pixels:
+            raise ValueError(
+                "reranker_max_pixels must be greater than or equal to "
+                "reranker_min_pixels"
+            )
+        if self.rerank_top_k > self.retrieval_top_k:
+            raise ValueError("rerank_top_k must not exceed retrieval_top_k")
+        if self.final_top_k > self.rerank_top_k:
+            raise ValueError("final_top_k must not exceed rerank_top_k")
+
         self.data_dir = self._resolve_path(self.data_dir)
         self.database_path = self._resolve_path(
             self.database_path or self.data_dir / "database" / "lecture_memory.db"
