@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.embeddings.base import EmbeddingProvider
 from app.models import Course, Lecture, Note, SlidePage
+from app.repositories.concept_repository import list_lecture_concepts
 from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.retrieval.index import FaissVectorIndex, VectorSearchResult
 from app.retrieval.reranker import Reranker
@@ -62,8 +63,14 @@ def search_lecture_memory(
     candidate_limit = index.count if has_filter else top_k
     candidates = index.search(query_vector, top_k=candidate_limit)
     results: list[SearchResult] = []
+    concept_cache: dict[int, tuple[str, ...]] = {}
     for candidate in candidates:
-        result = _resolve_candidate(session, candidate, rank=len(results) + 1)
+        result = _resolve_candidate(
+            session,
+            candidate,
+            rank=len(results) + 1,
+            concept_cache=concept_cache,
+        )
         if result is None:
             logger.warning(
                 "Skipping stale vector-index entity",
@@ -136,10 +143,21 @@ def _resolve_candidate(
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     if candidate.entity_type == "slide_page":
-        return _resolve_slide_result(session, candidate, rank=rank)
-    return _resolve_note_result(session, candidate, rank=rank)
+        return _resolve_slide_result(
+            session,
+            candidate,
+            rank=rank,
+            concept_cache=concept_cache,
+        )
+    return _resolve_note_result(
+        session,
+        candidate,
+        rank=rank,
+        concept_cache=concept_cache,
+    )
 
 
 def _resolve_slide_result(
@@ -147,6 +165,7 @@ def _resolve_slide_result(
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     statement = (
         select(SlidePage)
@@ -180,6 +199,7 @@ def _resolve_slide_result(
         raw_similarity=candidate.score,
         text_preview=_text_preview(page.text_content),
         related_notes=related_notes,
+        concepts=_lecture_concept_names(session, lecture.id, concept_cache),
     )
 
 
@@ -188,6 +208,7 @@ def _resolve_note_result(
     candidate: VectorSearchResult,
     *,
     rank: int,
+    concept_cache: dict[int, tuple[str, ...]],
 ) -> SearchResult | None:
     statement = (
         select(Note)
@@ -217,7 +238,23 @@ def _resolve_note_result(
         preview_path=note.page.image_path if note.page is not None else None,
         raw_similarity=candidate.score,
         text_preview=_text_preview(note.content),
+        concepts=_lecture_concept_names(session, lecture.id, concept_cache),
     )
+
+
+def _lecture_concept_names(
+    session: Session,
+    lecture_id: int,
+    cache: dict[int, tuple[str, ...]],
+) -> tuple[str, ...]:
+    concepts = cache.get(lecture_id)
+    if concepts is None:
+        concepts = tuple(
+            association.concept.name
+            for association in list_lecture_concepts(session, lecture_id)
+        )
+        cache[lecture_id] = concepts
+    return concepts
 
 
 def _text_preview(content: str | None) -> str | None:

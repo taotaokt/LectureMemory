@@ -3,8 +3,8 @@
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
 > **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
-> persistent indexing, filtered retrieval, and the configured Qwen reranking workflow are
-> available; the user interface is planned but not yet available.
+> persistent indexing, filtered retrieval, the configured Qwen reranking workflow, and local
+> concept extraction and display data are available; the interactive user interface is planned.
 
 ## Why Lecture Memory?
 
@@ -91,6 +91,9 @@ Planned core stack:
 - [x] Model-independent reranker interface
 - [x] Qwen3-VL multimodal reranker adapter
 - [x] Configured retrieval-to-rerank workflow
+- [x] Preserved embedding similarity and reranker scores
+- [x] Normalized lecture concept extraction and persistence
+- [x] Concept display data for lectures and search results
 - [ ] Streamlit interface
 - [ ] Retrieval benchmark and evaluation
 
@@ -260,6 +263,29 @@ results = search_and_rerank(
     final_top_k=settings.final_top_k,
 )
 ```
+
+`RuleBasedConceptExtractor` provides a lightweight initial concept extractor without requiring
+another model download. It combines the lecture title, extracted slide text, and personal notes;
+normalizes concept names for deduplication; and stores confidence-scored `auto_extracted`
+associations. Re-extraction replaces earlier automatic associations while retaining concepts
+added with the `manual` source. The extractor is intentionally replaceable so a future model-based
+implementation can use the same persistence workflow.
+
+```python
+from app.concepts import RuleBasedConceptExtractor
+from app.services.concept_service import extract_lecture_concepts
+
+summary = extract_lecture_concepts(
+    session,
+    lecture_id,
+    extractor=RuleBasedConceptExtractor(max_concepts=12),
+)
+```
+
+`get_lecture_concept_display` returns ordered, serializable concept metadata for a lecture.
+Unified slide and note `SearchResult` objects also include the lecture's ordered concept names,
+and reranking preserves that display metadata together with both relevance scores. Streamlit can
+consume these objects directly without accessing database associations.
 
 ## Planned Retrieval Evaluation
 

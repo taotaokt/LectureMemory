@@ -117,6 +117,44 @@ class NoteRead(BaseModel):
     updated_at: datetime
 
 
+ConceptSource = Literal["slides", "notes", "auto_extracted", "manual"]
+
+
+class ConceptRead(BaseModel):
+    """Serializable representation of a normalized concept."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    normalized_name: str
+    description: str | None
+    created_at: datetime
+
+
+class LectureConceptRead(BaseModel):
+    """Serializable representation of a lecture-to-concept association."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lecture_id: int
+    concept_id: int
+    confidence: float = Field(ge=0, le=1)
+    source: ConceptSource
+    created_at: datetime
+
+
+class LectureConceptDisplay(BaseModel):
+    """Frontend-safe concept metadata for a lecture or search result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    normalized_name: str
+    confidence: float = Field(ge=0, le=1)
+    source: ConceptSource
+
+
 EmbeddingEntityType = Literal["slide_page", "note"]
 
 

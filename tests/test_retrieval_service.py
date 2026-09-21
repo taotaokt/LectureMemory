@@ -14,6 +14,10 @@ from app.database import (
     session_scope,
 )
 from app.embeddings.base import EmbeddingProvider, RawEmbedding
+from app.repositories.concept_repository import (
+    assign_lecture_concept,
+    get_or_create_concept,
+)
 from app.repositories.course_repository import create_course
 from app.repositories.errors import CourseNotFoundError, LectureNotFoundError
 from app.repositories.lecture_repository import create_lecture
@@ -128,6 +132,7 @@ def create_search_fixture(factory: sessionmaker[Session]) -> dict[str, int]:
             NoteCreate(content="Compare against ordinary multiplication."),
         )
         return {
+            "lecture": lecture.id,
             "first_page": first_page.id,
             "second_page": second_page.id,
             "attached_note": attached_note.id,
@@ -278,6 +283,63 @@ def test_search_returns_normalized_mixed_results_in_similarity_order(
     assert note.raw_similarity == pytest.approx(0.8)
     assert note.text_preview == "Karatsuba uses three subproblems."
     assert note.related_notes == ()
+
+
+def test_search_and_rerank_exposes_lecture_concepts_for_slides_and_notes(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    with session_scope(retrieval_session_factory) as session:
+        master_theorem, _ = get_or_create_concept(
+            session,
+            name="Master Theorem",
+            normalized_name="master theorem",
+        )
+        divide_and_conquer, _ = get_or_create_concept(
+            session,
+            name="Divide and Conquer",
+            normalized_name="divide and conquer",
+        )
+        assign_lecture_concept(
+            session,
+            lecture_id=ids["lecture"],
+            concept_id=master_theorem.id,
+            confidence=0.8,
+            source="auto_extracted",
+        )
+        assign_lecture_concept(
+            session,
+            lecture_id=ids["lecture"],
+            concept_id=divide_and_conquer.id,
+            confidence=1.0,
+            source="manual",
+        )
+
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0], [0.8, 0.6, 0.0]],
+        entities=[
+            IndexedEntity("slide_page", ids["first_page"]),
+            IndexedEntity("note", ids["attached_note"]),
+        ],
+    )
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "recursive multiplication",
+            provider=QueryEmbeddingProvider(),
+            index=index,
+            reranker=RecordingReranker([0.4, 0.9]),
+            retrieval_top_k=2,
+            rerank_top_k=2,
+            final_top_k=2,
+        )
+
+    assert [result.result_type for result in results] == ["note", "slide"]
+    assert all(
+        result.concepts == ("Divide and Conquer", "Master Theorem")
+        for result in results
+    )
 
 
 def test_search_and_rerank_applies_each_top_k_stage(
