@@ -4,7 +4,8 @@ Lecture Memory is a local, multimodal study-memory system designed to help stude
 
 > **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
 > persistent indexing, filtered retrieval, the configured Qwen reranking workflow, and local
-> concept extraction and display data are available; the interactive user interface is planned.
+> concept extraction and display data are available. The Streamlit course home screen is usable;
+> course, lecture, and search screens are planned.
 
 ## Why Lecture Memory?
 
@@ -94,14 +95,15 @@ Planned core stack:
 - [x] Preserved embedding similarity and reranker scores
 - [x] Normalized lecture concept extraction and persistence
 - [x] Concept display data for lectures and search results
-- [ ] Streamlit interface
+- [x] Streamlit course home screen and course creation
+- [ ] Streamlit course, lecture, and search screens
 - [ ] Retrieval benchmark and evaluation
 
 Development is intentionally incremental. Each stage is tested before the next major capability is introduced.
 
 ## Getting Started
 
-The current repository contains the project foundation and development tooling. It does not yet provide a runnable end-user application.
+The repository includes a runnable Streamlit home screen for creating and browsing courses.
 
 ```bash
 git clone https://github.com/taotaokt/LectureMemory.git
@@ -118,6 +120,16 @@ Run the checks:
 pytest
 ruff check .
 ```
+
+Start the local interface:
+
+```bash
+streamlit run frontend/streamlit_app.py
+```
+
+The app initializes missing SQLite tables automatically using `DATABASE_PATH`. The home screen
+lists every course with its code and lecture count, supports creating a course, and records the
+selected course in the URL for the upcoming course workspace.
 
 ### Optional Qwen embedding runtime
 

@@ -29,6 +29,18 @@ class CourseRead(BaseModel):
     updated_at: datetime
 
 
+class CourseSummary(BaseModel):
+    """Frontend-safe course overview with its current lecture count."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int = Field(gt=0)
+    name: str
+    code: str
+    description: str | None
+    lecture_count: int = Field(ge=0)
+
+
 class LectureCreate(BaseModel):
     """Validated input for creating a lecture within a course."""
 
