@@ -67,6 +67,54 @@ class LectureRead(BaseModel):
     updated_at: datetime
 
 
+class LectureSummary(BaseModel):
+    """Frontend-safe lecture overview with persisted content counts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int = Field(gt=0)
+    course_id: int = Field(gt=0)
+    title: str
+    lecture_number: int = Field(gt=0)
+    lecture_date: date | None
+    source_pdf: str | None
+    slide_count: int = Field(ge=0)
+    note_count: int = Field(ge=0)
+
+
+class CourseWorkspace(BaseModel):
+    """Course-page projection containing metadata and ordered lectures."""
+
+    model_config = ConfigDict(frozen=True)
+
+    course: CourseSummary
+    lectures: tuple[LectureSummary, ...]
+
+
+class SlidePageDisplay(BaseModel):
+    """Frontend-safe slide metadata for browsing one lecture."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int = Field(gt=0)
+    page_number: int = Field(gt=0)
+    image_path: str
+    text_content: str | None
+
+
+class NoteDisplay(BaseModel):
+    """Frontend-safe note metadata with its optional slide number."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int = Field(gt=0)
+    content: str
+    page_id: int | None = Field(default=None, gt=0)
+    page_number: int | None = Field(default=None, gt=0)
+    created_at: datetime
+    updated_at: datetime
+
+
 class SlidePageCreate(BaseModel):
     """Validated metadata for one rendered lecture page."""
 
@@ -165,6 +213,18 @@ class LectureConceptDisplay(BaseModel):
     normalized_name: str
     confidence: float = Field(ge=0, le=1)
     source: ConceptSource
+
+
+class LectureWorkspace(BaseModel):
+    """Lecture-page projection containing all directly viewable content."""
+
+    model_config = ConfigDict(frozen=True)
+
+    course: CourseSummary
+    lecture: LectureSummary
+    concepts: tuple[LectureConceptDisplay, ...]
+    slides: tuple[SlidePageDisplay, ...]
+    notes: tuple[NoteDisplay, ...]
 
 
 EmbeddingEntityType = Literal["slide_page", "note"]

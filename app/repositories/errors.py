@@ -17,5 +17,9 @@ class NotePageMismatchError(ValueError):
     """Raised when a note references a page from a different lecture."""
 
 
+class NoteNotFoundError(ValueError):
+    """Raised when an operation references a note outside the expected lecture."""
+
+
 class DuplicateSlidePageError(ValueError):
     """Raised when a lecture already has the requested page number."""

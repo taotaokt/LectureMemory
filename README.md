@@ -4,8 +4,10 @@ Lecture Memory is a local, multimodal study-memory system designed to help stude
 
 > **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
 > persistent indexing, filtered retrieval, the configured Qwen reranking workflow, and local
-> concept extraction and display data are available. The Streamlit course home screen is usable;
-> course, lecture, and search screens are planned.
+> concept extraction and display data are available. The Streamlit course home and course
+> workspace are usable, including lecture slide browsing, note editing, course-scoped natural-
+> language search, and ranked result cards. A validated 50-query bilingual benchmark covers
+> three real course PDFs; quantitative retrieval evaluation is the next phase.
 
 ## Why Lecture Memory?
 
@@ -96,8 +98,11 @@ Planned core stack:
 - [x] Normalized lecture concept extraction and persistence
 - [x] Concept display data for lectures and search results
 - [x] Streamlit course home screen and course creation
-- [ ] Streamlit course, lecture, and search screens
-- [ ] Retrieval benchmark and evaluation
+- [x] Streamlit course workspace, lecture creation, and PDF upload
+- [x] Streamlit lecture detail, slide browsing, and note editing
+- [x] Streamlit course search and ranked result screen
+- [x] 50-query bilingual retrieval benchmark with source-page validation
+- [ ] BM25 baseline and retrieval evaluation runner
 
 Development is intentionally incremental. Each stage is tested before the next major capability is introduced.
 
@@ -124,12 +129,19 @@ ruff check .
 Start the local interface:
 
 ```bash
-streamlit run frontend/streamlit_app.py
+streamlit run streamlit_app.py
 ```
 
 The app initializes missing SQLite tables automatically using `DATABASE_PATH`. The home screen
 lists every course with its code and lecture count, supports creating a course, and records the
-selected course in the URL for the upcoming course workspace.
+selected course in the URL. A course workspace supports filtering and creating lectures, shows
+slide and note counts, and uploads PDFs through the validated ingestion pipeline. Uploading a PDF
+stores the source, renders its pages, and extracts its text; embedding and indexing remain
+separate explicit operations. Each lecture has a detail workspace for browsing rendered slides,
+reviewing extracted concepts, and adding or editing general or slide-specific notes. Course
+workspaces also expose natural-language search over the persisted FAISS index. Each result shows
+its course, lecture, page, preview, text, related notes, concepts, embedding similarity, and
+reranker score. Search reports a setup message when `INDEX_DIR` does not contain a saved index.
 
 ### Optional Qwen embedding runtime
 
@@ -299,9 +311,18 @@ Unified slide and note `SearchResult` objects also include the lecture's ordered
 and reranking preserves that display metadata together with both relevance scores. Streamlit can
 consume these objects directly without accessing database associations.
 
-## Planned Retrieval Evaluation
+## Retrieval Evaluation
 
-Retrieval quality will be measured rather than inferred from demonstrations. The benchmark will use realistic student queries and report:
+Retrieval quality is measured rather than inferred from demonstrations. The first dataset contains
+50 English and Chinese student-style queries across semantic, visual, and note-oriented recall.
+Its schema, source PDFs, and page ranges can be validated locally:
+
+```bash
+python -m scripts.validate_benchmark
+```
+
+See [benchmark/README.md](benchmark/README.md) for the annotation contract. The evaluation runner
+will report:
 
 - Recall@1, Recall@5, and Recall@10;
 - Mean Reciprocal Rank (MRR);
