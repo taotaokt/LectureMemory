@@ -6,13 +6,14 @@ from types import SimpleNamespace
 import pytest
 
 from app.config import Settings
-from app.retrieval import FaissVectorIndex
+from app.retrieval import FaissVectorIndex, IndexedEntity
 from app.schemas import SearchResult
 from app.services.search_runtime_service import (
     SearchRuntime,
     SearchRuntimeUnavailableError,
     build_search_runtime,
     search_course_memory,
+    search_index_revision,
 )
 
 
@@ -47,6 +48,21 @@ def test_build_search_runtime_reports_missing_snapshot(tmp_path: Path) -> None:
 
     with pytest.raises(SearchRuntimeUnavailableError, match="No usable search index"):
         build_search_runtime(settings)
+
+
+def test_search_index_revision_changes_when_snapshot_is_replaced(tmp_path: Path) -> None:
+    index_dir = tmp_path / "index"
+    missing_revision = search_index_revision(index_dir)
+    index = FaissVectorIndex(2)
+    index.save(index_dir)
+    empty_revision = search_index_revision(index_dir)
+    index.add([[1.0, 0.0]], [IndexedEntity("note", 1)])
+    index.save(index_dir)
+
+    assert search_index_revision(None) == "unconfigured"
+    assert "missing" in missing_revision
+    assert empty_revision != missing_revision
+    assert search_index_revision(index_dir) != empty_revision
 
 
 def test_search_course_memory_forwards_configured_limits_and_scope(

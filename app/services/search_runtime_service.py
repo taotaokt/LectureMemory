@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from app.retrieval import (
     Reranker,
     search_and_rerank,
 )
+from app.retrieval.index import INDEX_FILENAME, METADATA_FILENAME
 from app.schemas import SearchResult
 
 
@@ -29,6 +31,24 @@ class SearchRuntime:
     provider: EmbeddingProvider
     index: FaissVectorIndex
     reranker: Reranker
+
+
+def search_index_revision(index_dir: str | Path | None) -> str:
+    """Return a lightweight cache key that changes with the saved index snapshot."""
+    if index_dir is None:
+        return "unconfigured"
+
+    directory = Path(index_dir).expanduser().resolve()
+    revisions: list[str] = []
+    for filename in (INDEX_FILENAME, METADATA_FILENAME):
+        path = directory / filename
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            revisions.append(f"{filename}:missing")
+        else:
+            revisions.append(f"{filename}:{stat.st_mtime_ns}:{stat.st_size}")
+    return "|".join(revisions)
 
 
 def build_search_runtime(settings: Settings) -> SearchRuntime:

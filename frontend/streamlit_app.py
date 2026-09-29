@@ -46,6 +46,7 @@ from app.services.search_runtime_service import (
     SearchRuntimeUnavailableError,
     build_search_runtime,
     search_course_memory,
+    search_index_revision,
 )
 
 APP_TITLE = "Lecture Memory"
@@ -60,8 +61,9 @@ def _build_session_factory(database_path: str) -> sessionmaker[Session]:
 
 
 @st.cache_resource
-def _build_search_runtime(settings_payload: str) -> SearchRuntime:
+def _build_search_runtime(settings_payload: str, index_revision: str) -> SearchRuntime:
     """Build and cache heavyweight search resources for one configuration."""
+    del index_revision  # Its value intentionally participates in Streamlit's cache key.
     return build_search_runtime(Settings.model_validate_json(settings_payload))
 
 
@@ -522,7 +524,10 @@ def _execute_course_search(
     course_id: int,
     query: str,
 ) -> tuple[SearchResult, ...]:
-    runtime = _build_search_runtime(settings.model_dump_json())
+    runtime = _build_search_runtime(
+        settings.model_dump_json(),
+        search_index_revision(settings.index_dir),
+    )
     with session_factory() as session:
         return search_course_memory(
             session,

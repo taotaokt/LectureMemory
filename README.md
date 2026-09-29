@@ -101,6 +101,7 @@ Planned core stack:
 - [x] Streamlit course workspace, lecture creation, and PDF upload
 - [x] Streamlit lecture detail, slide browsing, and note editing
 - [x] Streamlit course search and ranked result screen
+- [x] Unified database-to-FAISS index build command
 - [x] 50-query bilingual retrieval benchmark with source-page validation
 - [ ] BM25 baseline and retrieval evaluation runner
 
@@ -180,6 +181,18 @@ RETRIEVAL_TOP_K=20
 RERANK_TOP_K=20
 FINAL_TOP_K=5
 ```
+
+After importing lecture PDFs and adding notes, build or refresh the complete search index:
+
+```bash
+python -m scripts.build_index
+```
+
+The command embeds every persisted slide and note, reuses unchanged vectors from
+`EMBEDDING_DIR`, and atomically replaces the FAISS snapshot under `INDEX_DIR`. A full rebuild
+also removes deleted database entities from search. Individual embedding failures are reported
+without discarding successful items, and the command exits nonzero when the resulting snapshot
+is partial. A running Streamlit app detects the replaced snapshot on the next search.
 
 Installing this optional runtime and downloading the default model require significant disk
 space:
