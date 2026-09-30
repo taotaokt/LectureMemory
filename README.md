@@ -7,7 +7,8 @@ Lecture Memory is a local, multimodal study-memory system designed to help stude
 > concept extraction and display data are available. The Streamlit course home and course
 > workspace are usable, including lecture slide browsing, note editing, course-scoped natural-
 > language search, and ranked result cards. A validated 50-query bilingual benchmark covers
-> three real course PDFs; quantitative retrieval evaluation is the next phase.
+> three real course PDFs, with BM25, multimodal embedding, reranking, quality metrics, and
+> per-stage latency evaluation available from one command.
 
 ## Why Lecture Memory?
 
@@ -103,7 +104,9 @@ Planned core stack:
 - [x] Streamlit course search and ranked result screen
 - [x] Unified database-to-FAISS index build command
 - [x] 50-query bilingual retrieval benchmark with source-page validation
-- [ ] BM25 baseline and retrieval evaluation runner
+- [x] Bilingual BM25 lexical baseline
+- [x] Recall@1/5/10 and MRR evaluation runner
+- [x] Embedding, retrieval, reranking, and total latency reporting
 
 Development is intentionally incremental. Each stage is tested before the next major capability is introduced.
 
@@ -335,12 +338,31 @@ python -m scripts.validate_benchmark
 ```
 
 See [benchmark/README.md](benchmark/README.md) for the annotation contract. The evaluation runner
-will report:
+requires the benchmark lectures to be ingested into the configured database. Run only the
+lightweight lexical baseline with:
+
+```bash
+python -m scripts.evaluate --methods bm25
+```
+
+After generating the persisted multimodal index, run the complete comparison with:
+
+```bash
+python -m scripts.build_index
+python -m scripts.evaluate
+```
+
+The runner reports:
 
 - Recall@1, Recall@5, and Recall@10;
 - Mean Reciprocal Rank (MRR);
 - embedding, retrieval, reranking, and total query latency;
 - comparisons between BM25, multimodal embeddings, and embeddings with reranking.
+
+Detailed per-query JSON and summary CSV files are written under `benchmark/results/`. Results
+map both slide hits and page-attached note hits back to stable lecture/page labels, deduplicate
+repeated page matches, and measure Recall@K as the average fraction of labeled relevant pages
+retrieved within K. Generated reports remain local because benchmark source lectures are private.
 
 Private or copyrighted lecture materials will not be committed to the repository.
 

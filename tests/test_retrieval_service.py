@@ -31,6 +31,7 @@ from app.retrieval import (
     SearchFilterMismatchError,
     search_and_rerank,
     search_lecture_memory,
+    search_lecture_memory_by_vector,
 )
 from app.schemas import CourseCreate, LectureCreate, NoteCreate, SearchResult, SlidePageCreate
 
@@ -283,6 +284,30 @@ def test_search_returns_normalized_mixed_results_in_similarity_order(
     assert note.raw_similarity == pytest.approx(0.8)
     assert note.text_preview == "Karatsuba uses three subproblems."
     assert note.related_notes == ()
+
+
+def test_precomputed_query_vector_uses_normal_result_resolution(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0]],
+        entities=[IndexedEntity("slide_page", ids["first_page"])],
+    )
+
+    with retrieval_session_factory() as session:
+        results = search_lecture_memory_by_vector(
+            session,
+            [1.0, 0.0, 0.0],
+            index=index,
+            top_k=1,
+        )
+
+    assert len(results) == 1
+    assert results[0].entity_id == ids["first_page"]
+    assert results[0].page_number == 17
+    assert results[0].raw_similarity == pytest.approx(1.0)
 
 
 def test_search_and_rerank_exposes_lecture_concepts_for_slides_and_notes(

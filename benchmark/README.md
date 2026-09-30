@@ -31,6 +31,26 @@ SQLite database:
 python -m scripts.validate_benchmark --database data/database/lecture_memory.db
 ```
 
+Once those lectures exist in the configured database, run the dependency-free bilingual BM25
+baseline with:
+
+```bash
+python -m scripts.evaluate --methods bm25
+```
+
+For the complete comparison, first build the FAISS index and then evaluate all three methods:
+
+```bash
+python -m scripts.build_index
+python -m scripts.evaluate
+```
+
+The full run compares BM25, Qwen multimodal embeddings, and Qwen embeddings plus reranking. It
+prints Recall@1, Recall@5, Recall@10, MRR, and average latency, then writes detailed JSON and a
+summary CSV under `benchmark/results/`. Use `--help` to override paths, methods, retrieval depth,
+or the output run ID. BM25 indexes extracted slide text plus notes attached to each page; the
+multimodal methods map both slide and attached-note results back to the same page labels.
+
 Each JSONL record uses this shape:
 
 ```json

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from numpy.typing import ArrayLike
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -59,6 +60,53 @@ def search_lecture_memory(
         return ()
 
     query_vector = provider.embed_query(cleaned_query)
+    return _search_lecture_memory_by_vector(
+        session,
+        query_vector,
+        index=index,
+        top_k=top_k,
+        course_id=course_id,
+        lecture_id=lecture_id,
+    )
+
+
+def search_lecture_memory_by_vector(
+    session: Session,
+    query_vector: ArrayLike,
+    *,
+    index: FaissVectorIndex,
+    top_k: int = DEFAULT_TOP_K,
+    course_id: int | None = None,
+    lecture_id: int | None = None,
+) -> tuple[SearchResult, ...]:
+    """Search a prepared query vector while retaining normal scope and result handling."""
+    _validate_top_k(top_k)
+    _validate_search_scope(
+        session,
+        course_id=course_id,
+        lecture_id=lecture_id,
+    )
+    if index.count == 0:
+        return ()
+    return _search_lecture_memory_by_vector(
+        session,
+        query_vector,
+        index=index,
+        top_k=top_k,
+        course_id=course_id,
+        lecture_id=lecture_id,
+    )
+
+
+def _search_lecture_memory_by_vector(
+    session: Session,
+    query_vector: ArrayLike,
+    *,
+    index: FaissVectorIndex,
+    top_k: int,
+    course_id: int | None,
+    lecture_id: int | None,
+) -> tuple[SearchResult, ...]:
     has_filter = course_id is not None or lecture_id is not None
     candidate_limit = index.count if has_filter else top_k
     candidates = index.search(query_vector, top_k=candidate_limit)

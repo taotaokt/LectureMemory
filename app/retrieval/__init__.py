@@ -31,6 +31,7 @@ from app.retrieval.service import (
     SearchFilterMismatchError,
     search_and_rerank,
     search_lecture_memory,
+    search_lecture_memory_by_vector,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "VectorSearchResult",
     "search_and_rerank",
     "search_lecture_memory",
+    "search_lecture_memory_by_vector",
 ]
