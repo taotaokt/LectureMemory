@@ -77,6 +77,7 @@ def test_report_aggregates_metrics_and_writes_json_and_csv(tmp_path: Path) -> No
         runs,
         dataset=tmp_path / "queries.jsonl",
         generated_at=datetime(2026, 9, 29, tzinfo=UTC),
+        configuration={"reranker_batch_size": 1},
     )
 
     bm25, embedding = report.methods
@@ -98,6 +99,7 @@ def test_report_aggregates_metrics_and_writes_json_and_csv(tmp_path: Path) -> No
         rows = list(csv.DictReader(source))
 
     assert payload["generated_at"] == "2026-09-29T00:00:00+00:00"
+    assert payload["configuration"] == {"reranker_batch_size": 1}
     assert len(payload["queries"]) == 4
     assert [row["method"] for row in rows] == ["BM25", "Qwen Embedding"]
 

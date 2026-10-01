@@ -195,7 +195,9 @@ The command embeds every persisted slide and note, reuses unchanged vectors from
 `EMBEDDING_DIR`, and atomically replaces the FAISS snapshot under `INDEX_DIR`. A full rebuild
 also removes deleted database entities from search. Individual embedding failures are reported
 without discarding successful items, and the command exits nonzero when the resulting snapshot
-is partial. A running Streamlit app detects the replaced snapshot on the next search.
+is partial. Progress is printed per entity, and cache metadata is checkpointed every 10 entities
+so an interrupted run can resume without recomputing completed vectors. A running Streamlit app
+detects the replaced snapshot on the next search.
 
 Installing this optional runtime and downloading the default model require significant disk
 space:
@@ -363,6 +365,20 @@ Detailed per-query JSON and summary CSV files are written under `benchmark/resul
 map both slide hits and page-attached note hits back to stable lecture/page labels, deduplicate
 repeated page matches, and measure Recall@K as the average fraction of labeled relevant pages
 retrieved within K. Generated reports remain local because benchmark source lectures are private.
+
+A local Apple MPS reference run on September 30, 2026 produced the following page-level
+results over all 50 queries. The reranker used `batch_size=1` and `max_pixels=131072` because
+the current Transformers/MPS multi-image batch path produced non-finite float16 scores:
+
+| Method | R@1 | R@5 | R@10 | MRR | Mean total latency |
+|---|---:|---:|---:|---:|---:|
+| BM25 | 0.360 | 0.540 | 0.600 | 0.419 | 0.3 ms |
+| Qwen Embedding | 0.740 | 0.900 | 1.000 | 0.816 | 304.7 ms |
+| Qwen + Reranker | 0.720 | 0.960 | 0.980 | 0.801 | 10,515.9 ms |
+
+The reranker improved Recall@5 but reduced R@1 and MRR on this first dataset. This makes
+reranker calibration, instructions, and candidate-depth tuning a measured follow-up rather than
+an assumed quality improvement.
 
 Private or copyrighted lecture materials will not be committed to the repository.
 

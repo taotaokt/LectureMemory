@@ -22,7 +22,7 @@ from app.repositories.note_repository import create_note
 from app.repositories.slide_page_repository import create_slide_page
 from app.retrieval import FaissVectorIndex
 from app.schemas import CourseCreate, LectureCreate, NoteCreate, SlidePageCreate
-from app.services.indexing_service import build_search_index
+from app.services.indexing_service import IndexingProgress, build_search_index
 
 
 class IndexEmbeddingProvider(EmbeddingProvider):
@@ -117,6 +117,7 @@ def test_build_generates_then_reuses_embeddings(
     provider = IndexEmbeddingProvider()
     cache = EmbeddingCache(tmp_path / "embeddings")
     index_dir = tmp_path / "index"
+    progress: list[IndexingProgress] = []
 
     with session_scope(indexing_session_factory) as session:
         first = build_search_index(
@@ -124,6 +125,7 @@ def test_build_generates_then_reuses_embeddings(
             provider=provider,
             cache=cache,
             index_dir=index_dir,
+            progress_callback=progress.append,
         )
     with session_scope(indexing_session_factory) as session:
         second = build_search_index(
@@ -145,6 +147,9 @@ def test_build_generates_then_reuses_embeddings(
     assert first.indexed_entities == 4
     assert first.generated_embeddings == 4
     assert first.cached_embeddings == 0
+    assert [event.processed for event in progress] == [1, 2, 3, 4]
+    assert all(event.total == 4 for event in progress)
+    assert [event.status for event in progress] == ["generated"] * 4
     assert second.complete is True
     assert second.generated_embeddings == 0
     assert second.cached_embeddings == 4

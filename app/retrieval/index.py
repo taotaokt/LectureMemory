@@ -4,10 +4,23 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from dataclasses import dataclass
+from importlib import import_module
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Self
+
+# On macOS, the pip FAISS and optional PyTorch wheels bundle different OpenMP
+# runtimes. Single-thread execution plus the duplicate-runtime compatibility flag
+# prevents their native abort; exact-search scores remain covered by vector-index tests.
+if sys.platform == "darwin" and find_spec("torch") is not None:
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+    torch_runtime = import_module("torch")
+    torch_runtime.set_num_threads(1)
+    torch_runtime.empty(1)
 
 import faiss
 import numpy as np

@@ -8,7 +8,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.database import create_database_engine, create_session_factory, session_scope
 from app.embeddings import EmbeddingCache, Qwen3VLEmbeddingProvider
-from app.services.indexing_service import build_search_index
+from app.services.indexing_service import IndexingProgress, build_search_index
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,6 +16,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--database", type=Path, help="Override DATABASE_PATH.")
     parser.add_argument("--embedding-dir", type=Path, help="Override EMBEDDING_DIR.")
     parser.add_argument("--index-dir", type=Path, help="Override INDEX_DIR.")
+    parser.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=10,
+        help="Commit embedding cache metadata every N processed entities.",
+    )
     return parser
 
 
@@ -31,6 +37,8 @@ def main() -> None:
         raise SystemExit("EMBEDDING_DIR is not configured")
     if index_dir is None:
         raise SystemExit("INDEX_DIR is not configured")
+    if args.checkpoint_every <= 0:
+        raise SystemExit("--checkpoint-every must be positive")
 
     provider = Qwen3VLEmbeddingProvider(
         model_name=settings.model_name,
@@ -50,11 +58,21 @@ def main() -> None:
     )
     try:
         with session_scope(factory) as session:
+            def report_progress(progress: IndexingProgress) -> None:
+                print(
+                    f"[{progress.processed}/{progress.total}] "
+                    f"{progress.entity_type}:{progress.entity_id} {progress.status}",
+                    flush=True,
+                )
+                if progress.processed % args.checkpoint_every == 0:
+                    session.commit()
+
             summary = build_search_index(
                 session,
                 provider=provider,
                 cache=cache,
                 index_dir=index_dir,
+                progress_callback=report_progress,
             )
     finally:
         engine.dispose()

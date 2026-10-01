@@ -31,6 +31,19 @@ class FailingModel:
         raise RuntimeError("synthetic inference failure")
 
 
+class BatchSensitiveModel:
+    def __init__(self) -> None:
+        self.batch_sizes: list[int] = []
+
+    def score(self, **kwargs: Any) -> list[float]:
+        batch_size = kwargs["batch_size"]
+        self.batch_sizes.append(batch_size)
+        count = len(kwargs["documents"])
+        if batch_size > 1:
+            return [float("nan")] * count
+        return [0.1 * index for index in range(1, count + 1)]
+
+
 def make_result(
     entity_id: int,
     *,
@@ -201,6 +214,26 @@ def test_inference_errors_include_model_candidate_count_and_device(monkeypatch) 
         match="failed to rerank 1 candidates on mps: synthetic inference failure",
     ):
         reranker.rerank("query", [candidate])
+
+
+def test_non_finite_batch_scores_retry_one_candidate_at_a_time(monkeypatch) -> None:
+    model = BatchSensitiveModel()
+    install_fake_model(monkeypatch, model)
+    reranker = Qwen3VLReranker(batch_size=4)
+    candidates = [
+        make_result(
+            entity_id,
+            result_type="note",
+            preview_path=None,
+            text_preview=f"Note {entity_id}",
+        )
+        for entity_id in range(1, 4)
+    ]
+
+    results = reranker.rerank("query", candidates)
+
+    assert model.batch_sizes == [4, 1]
+    assert [result.entity_id for result in results] == [3, 2, 1]
 
 
 def test_missing_optional_dependencies_have_install_instructions(monkeypatch) -> None:

@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 PageKey = tuple[int, int]
 
@@ -66,6 +67,7 @@ class EvaluationReport:
 
     generated_at: str
     dataset: str
+    configuration: dict[str, Any]
     methods: tuple[MethodEvaluation, ...]
     queries: tuple[QueryEvaluation, ...]
 
@@ -75,6 +77,7 @@ def build_evaluation_report(
     *,
     dataset: str | Path,
     generated_at: datetime | None = None,
+    configuration: dict[str, Any] | None = None,
 ) -> EvaluationReport:
     """Aggregate per-query runs and verify that methods cover the same query set."""
     query_runs = tuple(runs)
@@ -109,6 +112,7 @@ def build_evaluation_report(
     return EvaluationReport(
         generated_at=timestamp.isoformat(),
         dataset=str(Path(dataset).expanduser().resolve()),
+        configuration=dict(configuration or {}),
         methods=methods,
         queries=query_runs,
     )

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +19,8 @@ from app.schemas import EmbeddingEntityType
 
 logger = logging.getLogger(__name__)
 
+IndexingStatus = Literal["generated", "cached", "failed"]
+
 
 @dataclass(frozen=True, slots=True)
 class IndexingFailure:
@@ -27,6 +31,17 @@ class IndexingFailure:
     lecture_id: int
     error_type: str
     message: str
+
+
+@dataclass(frozen=True, slots=True)
+class IndexingProgress:
+    """Progress event emitted after one entity has been processed."""
+
+    processed: int
+    total: int
+    entity_type: EmbeddingEntityType
+    entity_id: int
+    status: IndexingStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +82,7 @@ def build_search_index(
     provider: EmbeddingProvider,
     cache: EmbeddingCache,
     index_dir: str | Path,
+    progress_callback: Callable[[IndexingProgress], None] | None = None,
 ) -> IndexBuildSummary:
     """Embed every current slide and note, then atomically replace the index."""
     slides = tuple(
@@ -91,6 +107,8 @@ def build_search_index(
     cached_embeddings = 0
     indexed_slides = 0
     indexed_notes = 0
+    total_entities = len(slides) + len(notes)
+    processed = 0
 
     for slide in slides:
         image_path = Path(slide.image_path).expanduser().resolve()
@@ -115,12 +133,30 @@ def build_search_index(
                     error=exc,
                 )
             )
+            processed += 1
+            _report_progress(
+                progress_callback,
+                processed=processed,
+                total=total_entities,
+                entity_type="slide_page",
+                entity_id=slide.id,
+                status="failed",
+            )
             continue
         vectors.append(result.vector)
         entities.append(IndexedEntity("slide_page", slide.id))
         indexed_slides += 1
         generated_embeddings += int(not result.cache_hit)
         cached_embeddings += int(result.cache_hit)
+        processed += 1
+        _report_progress(
+            progress_callback,
+            processed=processed,
+            total=total_entities,
+            entity_type="slide_page",
+            entity_id=slide.id,
+            status="cached" if result.cache_hit else "generated",
+        )
 
     for note in notes:
         try:
@@ -144,12 +180,30 @@ def build_search_index(
                     error=exc,
                 )
             )
+            processed += 1
+            _report_progress(
+                progress_callback,
+                processed=processed,
+                total=total_entities,
+                entity_type="note",
+                entity_id=note.id,
+                status="failed",
+            )
             continue
         vectors.append(result.vector)
         entities.append(IndexedEntity("note", note.id))
         indexed_notes += 1
         generated_embeddings += int(not result.cache_hit)
         cached_embeddings += int(result.cache_hit)
+        processed += 1
+        _report_progress(
+            progress_callback,
+            processed=processed,
+            total=total_entities,
+            entity_type="note",
+            entity_id=note.id,
+            status="cached" if result.cache_hit else "generated",
+        )
 
     destination = Path(index_dir).expanduser().resolve()
     index = FaissVectorIndex.build(
@@ -212,3 +266,24 @@ def _failure(
         },
     )
     return failure
+
+
+def _report_progress(
+    callback: Callable[[IndexingProgress], None] | None,
+    *,
+    processed: int,
+    total: int,
+    entity_type: EmbeddingEntityType,
+    entity_id: int,
+    status: IndexingStatus,
+) -> None:
+    if callback is not None:
+        callback(
+            IndexingProgress(
+                processed=processed,
+                total=total,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                status=status,
+            )
+        )

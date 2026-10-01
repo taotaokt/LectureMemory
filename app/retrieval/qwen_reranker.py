@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import math
 from importlib import import_module
 from pathlib import Path
 from threading import Lock
@@ -9,6 +11,8 @@ from typing import Any
 
 from app.retrieval.reranker import RawRerankerScores, Reranker, RerankerError
 from app.schemas import SearchResult
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_RERANKER_MODEL_NAME = "Qwen/Qwen3-VL-Reranker-2B"
 DEFAULT_RERANKER_INSTRUCTION = (
@@ -101,12 +105,28 @@ class Qwen3VLReranker(Reranker):
         model = self._get_model()
         try:
             with self._inference_lock:
-                return model.score(
+                scores = model.score(
                     query=query,
                     documents=documents,
                     instruction=self._instruction,
                     batch_size=self._batch_size,
                 )
+                if self._batch_size > 1 and not all(math.isfinite(score) for score in scores):
+                    logger.warning(
+                        "Retrying non-finite Qwen reranker batch with batch_size=1",
+                        extra={
+                            "model_name": self.model_name,
+                            "candidate_count": len(candidates),
+                            "batch_size": self._batch_size,
+                        },
+                    )
+                    scores = model.score(
+                        query=query,
+                        documents=documents,
+                        instruction=self._instruction,
+                        batch_size=1,
+                    )
+                return scores
         except Exception as exc:
             device = self._resolved_device or self._requested_device
             raise QwenRerankerError(
@@ -183,8 +203,9 @@ class _TransformersQwenRerankerRuntime:
         language_model.eval()
         self._model = language_model.model
         self._model.eval()
+        processor_source = _resolve_processor_source(model_name)
         self._processor = processor_type.from_pretrained(
-            model_name,
+            processor_source,
             trust_remote_code=True,
             padding_side="left",
         )
@@ -232,6 +253,7 @@ class _TransformersQwenRerankerRuntime:
         ]
         text = self._processor.apply_chat_template(
             conversations,
+            chat_template="reranker",
             tokenize=False,
             add_generation_prompt=True,
         )
@@ -275,11 +297,7 @@ class _TransformersQwenRerankerRuntime:
         document: dict[str, str],
         instruction: str,
     ) -> list[dict[str, Any]]:
-        content: list[dict[str, Any]] = [
-            {"type": "text", "text": f"<Instruct>: {instruction}"},
-            {"type": "text", "text": f"<Query>: {query}"},
-            {"type": "text", "text": "\n<Document>:"},
-        ]
+        content: list[dict[str, Any]] = []
         if image := document.get("image"):
             content.append(
                 {
@@ -294,19 +312,31 @@ class _TransformersQwenRerankerRuntime:
         return [
             {
                 "role": "system",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Judge whether the Document meets the requirements based on "
-                            "the Query and the Instruct provided. The answer can only be "
-                            '"yes" or "no".'
-                        ),
-                    }
-                ],
+                "content": [{"type": "text", "text": instruction}],
             },
-            {"role": "user", "content": content},
+            {
+                "role": "query",
+                "content": [{"type": "text", "text": query}],
+            },
+            {"role": "document", "content": content},
         ]
+
+
+def _resolve_processor_source(model_name: str) -> str:
+    """Use a local Hub snapshot to avoid remote additional-template resolution bugs."""
+    local_path = Path(model_name).expanduser()
+    if local_path.is_dir():
+        return str(local_path.resolve())
+
+    huggingface_hub = import_module("huggingface_hub")
+    huggingface_errors = import_module("huggingface_hub.errors")
+    try:
+        return huggingface_hub.snapshot_download(
+            repo_id=model_name,
+            local_files_only=True,
+        )
+    except huggingface_errors.LocalEntryNotFoundError:
+        return huggingface_hub.snapshot_download(repo_id=model_name)
 
 
 def _candidate_document(candidate: SearchResult) -> dict[str, str]:

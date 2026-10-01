@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from collections import defaultdict
+from importlib import import_module
 from pathlib import Path
 from time import perf_counter
 
@@ -138,13 +140,19 @@ def main() -> None:
                         instruction=settings.reranker_instruction,
                     )
 
-            for position, query in enumerate(queries, start=1):
+            query_contexts = []
+            for query in queries:
                 course_id = course_ids.get(query.course)
                 if course_id is None:
                     raise SystemExit(f"Course code is not in the database: {query.course}")
                 relevant_pages = tuple(relevant_by_query[query.id])
+                query_contexts.append((query, course_id, relevant_pages))
 
-                if bm25 is not None:
+            if bm25 is not None:
+                for position, (query, course_id, relevant_pages) in enumerate(
+                    query_contexts,
+                    start=1,
+                ):
                     started = perf_counter()
                     results = bm25.search(
                         query.query,
@@ -165,21 +173,36 @@ def main() -> None:
                             total_ms=retrieval_ms,
                         )
                     )
+                    print(f"BM25 {position}/{len(queries)}: {query.id}")
 
-                if provider is not None and vector_index is not None:
+            if provider is not None and vector_index is not None:
+                query_vectors = {}
+                embedding_times = {}
+                for position, (query, _, _) in enumerate(query_contexts, start=1):
                     started = perf_counter()
-                    query_vector = provider.embed_query(query.query)
-                    embedding_ms = _elapsed_ms(started)
+                    query_vectors[query.id] = provider.embed_query(query.query)
+                    embedding_times[query.id] = _elapsed_ms(started)
+                    print(f"Embedded {position}/{len(queries)}: {query.id}")
 
+                provider = None
+                _release_model_memory()
+                candidates_by_query = {}
+                retrieval_times = {}
+                for position, (query, course_id, relevant_pages) in enumerate(
+                    query_contexts,
+                    start=1,
+                ):
                     started = perf_counter()
                     candidates = search_lecture_memory_by_vector(
                         session,
-                        query_vector,
+                        query_vectors[query.id],
                         index=vector_index,
                         top_k=retrieval_top_k,
                         course_id=course_id,
                     )
                     retrieval_ms = _elapsed_ms(started)
+                    candidates_by_query[query.id] = candidates
+                    retrieval_times[query.id] = retrieval_ms
                     if "embedding" in methods:
                         runs.append(
                             QueryEvaluation(
@@ -187,17 +210,22 @@ def main() -> None:
                                 query_id=query.id,
                                 ranked_pages=_ranked_page_keys(candidates, args.max_k),
                                 relevant_pages=relevant_pages,
-                                embedding_ms=embedding_ms,
+                                embedding_ms=embedding_times[query.id],
                                 retrieval_ms=retrieval_ms,
-                                total_ms=embedding_ms + retrieval_ms,
+                                total_ms=embedding_times[query.id] + retrieval_ms,
                             )
                         )
+                    print(f"Retrieved {position}/{len(queries)}: {query.id}")
 
-                    if reranker is not None:
+                if reranker is not None:
+                    for position, (query, _, relevant_pages) in enumerate(
+                        query_contexts,
+                        start=1,
+                    ):
                         started = perf_counter()
                         reranked = reranker.rerank(
                             query.query,
-                            candidates[:rerank_top_k],
+                            candidates_by_query[query.id][:rerank_top_k],
                         )
                         reranking_ms = _elapsed_ms(started)
                         runs.append(
@@ -206,17 +234,47 @@ def main() -> None:
                                 query_id=query.id,
                                 ranked_pages=_ranked_page_keys(reranked, args.max_k),
                                 relevant_pages=relevant_pages,
-                                embedding_ms=embedding_ms,
-                                retrieval_ms=retrieval_ms,
+                                embedding_ms=embedding_times[query.id],
+                                retrieval_ms=retrieval_times[query.id],
                                 reranking_ms=reranking_ms,
-                                total_ms=embedding_ms + retrieval_ms + reranking_ms,
+                                total_ms=(
+                                    embedding_times[query.id]
+                                    + retrieval_times[query.id]
+                                    + reranking_ms
+                                ),
                             )
                         )
-                print(f"Evaluated {position}/{len(queries)}: {query.id}")
+                        print(f"Reranked {position}/{len(queries)}: {query.id}")
+
     finally:
         engine.dispose()
 
-    report = build_evaluation_report(runs, dataset=args.dataset)
+    report = build_evaluation_report(
+        runs,
+        dataset=args.dataset,
+        configuration={
+            "methods": list(methods),
+            "max_k": args.max_k,
+            "retrieval_top_k": retrieval_top_k,
+            "rerank_top_k": rerank_top_k,
+            "embedding_model": settings.model_name if uses_embeddings else None,
+            "embedding_dimension": settings.embedding_dimension if uses_embeddings else None,
+            "reranker_model": (
+                settings.reranker_model_name if "reranker" in methods else None
+            ),
+            "device": settings.device if uses_embeddings else None,
+            "embedding_dtype": settings.embedding_dtype if uses_embeddings else None,
+            "reranker_dtype": (
+                settings.reranker_dtype if "reranker" in methods else None
+            ),
+            "reranker_batch_size": (
+                settings.reranker_batch_size if "reranker" in methods else None
+            ),
+            "reranker_max_pixels": (
+                settings.reranker_max_pixels if "reranker" in methods else None
+            ),
+        },
+    )
     json_path, csv_path = write_evaluation_report(
         report,
         args.output_dir,
@@ -248,6 +306,16 @@ def _ranked_page_keys(
 
 def _elapsed_ms(started: float) -> float:
     return (perf_counter() - started) * 1000
+
+
+def _release_model_memory() -> None:
+    """Release one Qwen model before loading the next evaluation stage."""
+    gc.collect()
+    torch = import_module("torch")
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _print_summary(methods: tuple[MethodEvaluation, ...]) -> None:
