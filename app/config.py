@@ -84,7 +84,7 @@ class Settings(BaseSettings):
         validation_alias="RERANKER_MIN_PIXELS",
     )
     reranker_max_pixels: int = Field(
-        default=512 * 32 * 32,
+        default=128 * 32 * 32,
         ge=1,
         validation_alias="RERANKER_MAX_PIXELS",
     )

@@ -62,7 +62,7 @@ def test_settings_load_defaults(monkeypatch) -> None:
     assert settings.reranker_batch_size == 1
     assert settings.reranker_max_length == 10_240
     assert settings.reranker_min_pixels == 4096
-    assert settings.reranker_max_pixels == 524288
+    assert settings.reranker_max_pixels == 131072
     assert settings.reranker_instruction.startswith("Retrieve the lecture slide")
     assert settings.retrieval_top_k == 20
     assert settings.rerank_top_k == 20

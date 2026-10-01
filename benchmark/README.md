@@ -24,6 +24,17 @@ Validate the schema and all local PDF page references with:
 python -m scripts.validate_benchmark
 ```
 
+Create or resume the local benchmark database directly from those validated PDFs:
+
+```bash
+python -m scripts.prepare_benchmark
+```
+
+The preparation command derives courses and lectures from the stable dataset labels, renders
+every source page, stores its extracted text, and validates every label against the resulting
+SQLite database. It is idempotent: lectures that are already completely ingested are verified
+and skipped.
+
 To additionally verify that every label resolves to an ingested `SlidePage`, provide the local
 SQLite database:
 
@@ -42,7 +53,7 @@ For the complete comparison, first build the FAISS index and then evaluate all t
 
 ```bash
 python -m scripts.build_index
-python -m scripts.evaluate
+python -m scripts.evaluate --reranker-weight 0.6
 ```
 
 The full run compares BM25, Qwen multimodal embeddings, and Qwen embeddings plus reranking. It

@@ -37,6 +37,7 @@ def clear_configuration_cache() -> Iterator[None]:
 def build_app(monkeypatch, database_path: Path) -> AppTest:
     """Create an isolated AppTest bound to a temporary database."""
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
+    monkeypatch.setenv("INDEX_DIR", str(database_path.parent / f"{database_path.stem}-index"))
     get_settings.cache_clear()
     return AppTest.from_file(str(APP_PATH), default_timeout=10)
 

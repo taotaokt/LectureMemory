@@ -180,6 +180,7 @@ MODEL_NAME=Qwen/Qwen3-VL-Embedding-2B
 EMBEDDING_DTYPE=auto
 EMBEDDING_DIMENSION=2048
 RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
+RERANKER_MAX_PIXELS=131072
 RETRIEVAL_TOP_K=20
 RERANK_TOP_K=20
 FINAL_TOP_K=5
@@ -343,6 +344,13 @@ Its schema, source PDFs, and page ranges can be validated locally:
 python -m scripts.validate_benchmark
 ```
 
+Prepare or resume the local benchmark database from the authorized PDFs, then build its index:
+
+```bash
+python -m scripts.prepare_benchmark
+python -m scripts.build_index
+```
+
 See [benchmark/README.md](benchmark/README.md) for the annotation contract. The evaluation runner
 requires the benchmark lectures to be ingested into the configured database. Run only the
 lightweight lexical baseline with:
@@ -381,10 +389,19 @@ the current Transformers/MPS multi-image batch path produced non-finite float16 
 | Qwen + Reranker | 0.720 | 0.960 | 0.980 | 0.801 | 10,515.9 ms |
 
 The pure reranker improved Recall@5 but reduced R@1 and MRR on this first dataset. A post-hoc
-weighted reciprocal-rank analysis of the saved page rankings selected the current 0.6 reranker
-weight: it preserved the embedding R@1, matched the reranker's R@5, and slightly improved MRR in
-that analysis. Re-run `python -m scripts.evaluate --reranker-weight 0.6` to measure the fused
-entity-level pipeline on local materials; the weight remains configurable rather than hard-coded.
+weighted reciprocal-rank analysis selected a 0.6 reranker weight. A clean database and index
+rebuild on October 1, 2026 then measured the fused entity-level pipeline with 116 slide pages,
+`retrieval_top_k=20`, `rerank_top_k=10`, and a 131,072-pixel reranker budget:
+
+| Method | R@1 | R@5 | R@10 | MRR | Mean total latency |
+|---|---:|---:|---:|---:|---:|
+| Qwen Embedding | 0.700 | 0.880 | 0.980 | 0.791 | 576.5 ms |
+| Qwen + Rank Fusion | 0.740 | 0.920 | 0.980 | 0.818 | 17,282.2 ms |
+
+The fused ranking improved R@1 by 0.04, R@5 by 0.04, and MRR by 0.027 while preserving R@10
+within the same run. The weight remains configurable rather than hard-coded. The 131,072-pixel
+default is a deliberate Apple Silicon latency tradeoff; larger image budgets can be selected for
+separate quality experiments.
 
 Private or copyrighted lecture materials will not be committed to the repository.
 
