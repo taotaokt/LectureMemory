@@ -101,7 +101,7 @@ class Settings(BaseSettings):
         validation_alias="RETRIEVAL_TOP_K",
     )
     rerank_top_k: int = Field(
-        default=20,
+        default=10,
         ge=1,
         validation_alias="RERANK_TOP_K",
     )

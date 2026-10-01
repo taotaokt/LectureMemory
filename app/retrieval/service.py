@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 10
 DEFAULT_RETRIEVAL_TOP_K = 20
-DEFAULT_RERANK_TOP_K = 20
+DEFAULT_RERANK_TOP_K = 10
 DEFAULT_FINAL_TOP_K = 5
 DEFAULT_RERANKER_WEIGHT = 0.6
 DEFAULT_PREVIEW_LENGTH = 240
@@ -171,6 +171,21 @@ def search_and_rerank(
     )
     if not retrieved:
         return ()
+
+    if reranker_weight == 0:
+        results = tuple(
+            candidate.model_copy(update={"rank": rank})
+            for rank, candidate in enumerate(retrieved[:final_top_k], start=1)
+        )
+        logger.info(
+            "Completed retrieval without reranking",
+            extra={
+                "retrieved_count": len(retrieved),
+                "returned_count": len(results),
+                "reranker_weight": reranker_weight,
+            },
+        )
+        return results
 
     rerank_candidates = retrieved[:rerank_top_k]
     results = reranker.rerank(

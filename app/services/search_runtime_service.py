@@ -91,6 +91,7 @@ def search_course_memory(
     course_id: int,
     runtime: SearchRuntime,
     settings: Settings,
+    reranker_weight: float | None = None,
 ) -> tuple[SearchResult, ...]:
     """Run configured retrieval and reranking within one course."""
     return search_and_rerank(
@@ -102,6 +103,10 @@ def search_course_memory(
         retrieval_top_k=settings.retrieval_top_k,
         rerank_top_k=settings.rerank_top_k,
         final_top_k=settings.final_top_k,
-        reranker_weight=settings.reranker_weight,
+        reranker_weight=(
+            settings.reranker_weight
+            if reranker_weight is None
+            else reranker_weight
+        ),
         course_id=course_id,
     )

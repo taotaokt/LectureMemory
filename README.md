@@ -182,7 +182,7 @@ EMBEDDING_DIMENSION=2048
 RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
 RERANKER_MAX_PIXELS=131072
 RETRIEVAL_TOP_K=20
-RERANK_TOP_K=20
+RERANK_TOP_K=10
 FINAL_TOP_K=5
 RERANKER_WEIGHT=0.6
 ```
@@ -276,11 +276,16 @@ execution. Slide candidates use the rendered image together with extracted text 
 note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
 
 `search_and_rerank` connects the complete query path. By default it retrieves 20 vector-search
-candidates, sends up to 20 candidates to the reranker, fuses the embedding and reranker ranks
+candidates, sends up to 10 candidates to the reranker, fuses the embedding and reranker ranks
 with a 40/60 weighted reciprocal-rank score, and returns the best 5. Rank fusion avoids assuming
 that cosine similarities and reranker probabilities share a directly comparable scale. Course and lecture
 filters are applied before reranking, empty indexes avoid loading either model, and configuration
 requires `FINAL_TOP_K <= RERANK_TOP_K <= RETRIEVAL_TOP_K`.
+
+The course workspace exposes fast and reranked search per query. Fast search keeps the multimodal
+embedding retrieval but sets the reranker contribution to zero, so the reranker model is never
+loaded or called. Reranked search uses the configured rank fusion when the extra latency is worth
+the measured quality gain.
 
 ```python
 from app.config import get_settings

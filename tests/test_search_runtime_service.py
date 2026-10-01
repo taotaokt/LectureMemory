@@ -124,3 +124,36 @@ def test_search_course_memory_forwards_configured_limits_and_scope(
         "reranker_weight": pytest.approx(0.6),
         "course_id": 3,
     }
+
+
+def test_search_course_memory_allows_per_query_fast_mode(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = make_settings(tmp_path)
+    captured: dict[str, object] = {}
+
+    def fake_search(session, query, **kwargs):
+        captured.update(kwargs)
+        return ()
+
+    monkeypatch.setattr(
+        "app.services.search_runtime_service.search_and_rerank",
+        fake_search,
+    )
+    runtime = SearchRuntime(
+        provider=SimpleNamespace(),
+        index=FaissVectorIndex(64),
+        reranker=SimpleNamespace(),
+    )
+
+    search_course_memory(
+        SimpleNamespace(),
+        "fast query",
+        course_id=3,
+        runtime=runtime,
+        settings=settings,
+        reranker_weight=0.0,
+    )
+
+    assert captured["reranker_weight"] == 0.0

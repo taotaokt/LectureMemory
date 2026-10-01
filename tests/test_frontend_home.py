@@ -287,7 +287,7 @@ def test_course_search_displays_ranked_result_and_opens_lecture(
 ) -> None:
     preview_path = tmp_path / "search-preview.png"
     preview_path.write_bytes(ONE_PIXEL_PNG)
-    search_calls: list[tuple[int, str]] = []
+    search_calls: list[tuple[int, str, float]] = []
 
     def fake_search(
         session_factory,
@@ -295,8 +295,9 @@ def test_course_search_displays_ranked_result_and_opens_lecture(
         *,
         course_id: int,
         query: str,
+        reranker_weight: float,
     ) -> tuple[SearchResult, ...]:
-        search_calls.append((course_id, query))
+        search_calls.append((course_id, query, reranker_weight))
         return (
             SearchResult(
                 result_type="slide",
@@ -330,13 +331,16 @@ def test_course_search_displays_ranked_result_and_opens_lecture(
     search_input = [item for item in app.text_input if item.label == "Natural-language query"]
     assert len(search_input) == 1
     search_input[0].input("why is Karatsuba faster?")
+    assert app.toggle[0].label == "Use multimodal reranking"
+    assert app.toggle[0].value is False
+    app.toggle[0].set_value(True)
     search_buttons = [button for button in app.button if button.label == "Search"]
     assert len(search_buttons) == 1
     search_buttons[0].click()
     app.run()
 
     assert not app.exception
-    assert search_calls == [(1, "why is Karatsuba faster?")]
+    assert search_calls == [(1, "why is Karatsuba faster?", 0.6)]
     assert any(item.value == "### 1. Slide" for item in app.markdown)
     assert any(
         item.value == "Three recursive calls reduce the multiplication work."

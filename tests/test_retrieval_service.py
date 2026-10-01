@@ -496,6 +496,43 @@ def test_search_and_rerank_empty_index_skips_both_models(
     assert reranker.calls == []
 
 
+def test_zero_reranker_weight_skips_model_and_returns_embedding_order(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0], [0.8, 0.6, 0.0], [0.6, 0.8, 0.0]],
+        entities=[
+            IndexedEntity("slide_page", ids["first_page"]),
+            IndexedEntity("note", ids["attached_note"]),
+            IndexedEntity("slide_page", ids["second_page"]),
+        ],
+    )
+    reranker = RecordingReranker([0.1, 0.8, 0.9])
+
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "fast Karatsuba search",
+            provider=QueryEmbeddingProvider(),
+            index=index,
+            reranker=reranker,
+            retrieval_top_k=3,
+            rerank_top_k=3,
+            final_top_k=2,
+            reranker_weight=0.0,
+        )
+
+    assert [(item.result_type, item.entity_id) for item in results] == [
+        ("slide", ids["first_page"]),
+        ("note", ids["attached_note"]),
+    ]
+    assert [item.rank for item in results] == [1, 2]
+    assert all(item.reranker_score is None for item in results)
+    assert reranker.calls == []
+
+
 @pytest.mark.parametrize(
     ("limits", "message"),
     [

@@ -469,6 +469,14 @@ def _render_course_search(
             "Natural-language query",
             placeholder="Where did we discuss three recursive multiplication calls?",
         )
+        use_reranker = st.toggle(
+            "Use multimodal reranking",
+            value=False,
+            help=(
+                "Improves ranking quality but is substantially slower on Apple Silicon. "
+                "Fast search still uses multimodal embeddings."
+            ),
+        )
         submitted = st.form_submit_button("Search", width="stretch")
 
     if submitted:
@@ -485,6 +493,7 @@ def _render_course_search(
                         settings,
                         course_id=course_id,
                         query=cleaned_query,
+                        reranker_weight=settings.reranker_weight if use_reranker else 0.0,
                     )
                 except (
                     SearchRuntimeUnavailableError,
@@ -505,7 +514,8 @@ def _render_course_search(
     stored_results = st.session_state.get(results_key)
     if stored_results is None:
         st.caption(
-            "Search uses the persisted multimodal index and reranks matches within this course."
+            "Fast search uses the persisted multimodal index. Enable multimodal reranking "
+            "when the extra quality is worth the longer wait."
         )
         return
     if not stored_results:
@@ -523,6 +533,7 @@ def _execute_course_search(
     *,
     course_id: int,
     query: str,
+    reranker_weight: float,
 ) -> tuple[SearchResult, ...]:
     runtime = _build_search_runtime(
         settings.model_dump_json(),
@@ -535,6 +546,7 @@ def _execute_course_search(
             course_id=course_id,
             runtime=runtime,
             settings=settings,
+            reranker_weight=reranker_weight,
         )
 
 
