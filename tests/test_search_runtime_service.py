@@ -121,5 +121,6 @@ def test_search_course_memory_forwards_configured_limits_and_scope(
         "retrieval_top_k": 6,
         "rerank_top_k": 4,
         "final_top_k": 2,
+        "reranker_weight": pytest.approx(0.6),
         "course_id": 3,
     }

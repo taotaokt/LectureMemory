@@ -25,6 +25,7 @@ from app.retrieval.reranker import (
 from app.retrieval.service import (
     DEFAULT_FINAL_TOP_K,
     DEFAULT_RERANK_TOP_K,
+    DEFAULT_RERANKER_WEIGHT,
     DEFAULT_RETRIEVAL_TOP_K,
     DEFAULT_TOP_K,
     RetrievalConfigurationError,
@@ -38,6 +39,7 @@ __all__ = [
     "DuplicateEntityError",
     "DEFAULT_FINAL_TOP_K",
     "DEFAULT_RERANK_TOP_K",
+    "DEFAULT_RERANKER_WEIGHT",
     "DEFAULT_RETRIEVAL_TOP_K",
     "DEFAULT_TOP_K",
     "DEFAULT_RERANKER_INSTRUCTION",

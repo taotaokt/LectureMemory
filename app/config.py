@@ -110,6 +110,12 @@ class Settings(BaseSettings):
         ge=1,
         validation_alias="FINAL_TOP_K",
     )
+    reranker_weight: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        validation_alias="RERANKER_WEIGHT",
+    )
 
     @model_validator(mode="after")
     def resolve_storage_paths(self) -> Self:

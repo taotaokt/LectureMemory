@@ -38,10 +38,12 @@ class Reranker(ABC):
         candidates: Sequence[SearchResult],
         *,
         top_k: int | None = None,
+        reranker_weight: float = 1.0,
     ) -> tuple[SearchResult, ...]:
-        """Score candidates, preserve embedding scores, and return a stable ranking."""
+        """Score candidates and optionally fuse retrieval and reranker ranks."""
         cleaned_query = _validate_query(query)
         _validate_top_k(top_k)
+        _validate_reranker_weight(reranker_weight)
         candidate_batch = tuple(candidates)
         _validate_candidates(candidate_batch)
         if not candidate_batch:
@@ -49,9 +51,22 @@ class Reranker(ABC):
 
         raw_scores = self._score(cleaned_query, candidate_batch)
         scores = _validate_scores(raw_scores, expected_count=len(candidate_batch))
+        scored_candidates = tuple(zip(candidate_batch, scores, strict=True))
+        reranked = sorted(
+            enumerate(scored_candidates),
+            key=lambda item: -item[1][1],
+        )
+        reranker_ranks = {
+            candidate_index: rank
+            for rank, (candidate_index, _) in enumerate(reranked, start=1)
+        }
         ranked = sorted(
-            zip(candidate_batch, scores, strict=True),
-            key=lambda item: -item[1],
+            enumerate(scored_candidates),
+            key=lambda item: -_fused_reciprocal_rank_score(
+                retrieval_rank=item[0] + 1,
+                reranker_rank=reranker_ranks[item[0]],
+                reranker_weight=reranker_weight,
+            ),
         )
         if top_k is not None:
             ranked = ranked[:top_k]
@@ -63,7 +78,7 @@ class Reranker(ABC):
                     "reranker_score": score,
                 }
             )
-            for rank, (candidate, score) in enumerate(ranked, start=1)
+            for rank, (_, (candidate, score)) in enumerate(ranked, start=1)
         )
         logger.info(
             "Reranked search results",
@@ -71,6 +86,7 @@ class Reranker(ABC):
                 "model_name": self.model_name,
                 "candidate_count": len(candidate_batch),
                 "returned_count": len(results),
+                "reranker_weight": reranker_weight,
             },
         )
         return results
@@ -98,6 +114,28 @@ def _validate_top_k(top_k: int | None) -> None:
         return
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
         raise ValueError("top_k must be a positive integer or None")
+
+
+def _validate_reranker_weight(reranker_weight: float) -> None:
+    if (
+        not isinstance(reranker_weight, (int, float))
+        or isinstance(reranker_weight, bool)
+        or not 0.0 <= float(reranker_weight) <= 1.0
+    ):
+        raise ValueError("reranker_weight must be a number between 0 and 1")
+
+
+def _fused_reciprocal_rank_score(
+    *,
+    retrieval_rank: int,
+    reranker_rank: int,
+    reranker_weight: float,
+) -> float:
+    """Combine two rankings without assuming comparable model-score scales."""
+    return (
+        (1.0 - reranker_weight) / retrieval_rank
+        + reranker_weight / reranker_rank
+    )
 
 
 def _validate_candidates(candidates: tuple[SearchResult, ...]) -> None:

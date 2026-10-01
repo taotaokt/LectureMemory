@@ -398,6 +398,7 @@ def test_search_and_rerank_applies_each_top_k_stage(
             retrieval_top_k=4,
             rerank_top_k=3,
             final_top_k=2,
+            reranker_weight=1.0,
         )
 
     assert len(reranker.calls) == 1
@@ -415,6 +416,39 @@ def test_search_and_rerank_applies_each_top_k_stage(
     assert [item.rank for item in results] == [1, 2]
     assert [item.reranker_score for item in results] == pytest.approx([0.9, 0.4])
     assert [item.raw_similarity for item in results] == pytest.approx([0.8, 0.6])
+
+
+def test_search_and_rerank_uses_fused_ranking_by_default(
+    retrieval_session_factory: sessionmaker[Session],
+) -> None:
+    ids = create_search_fixture(retrieval_session_factory)
+    index = FaissVectorIndex.build(
+        dimension=3,
+        vectors=[[1.0, 0.0, 0.0], [0.8, 0.6, 0.0], [0.6, 0.8, 0.0]],
+        entities=[
+            IndexedEntity("slide_page", ids["first_page"]),
+            IndexedEntity("note", ids["attached_note"]),
+            IndexedEntity("slide_page", ids["second_page"]),
+        ],
+    )
+
+    with retrieval_session_factory() as session:
+        results = search_and_rerank(
+            session,
+            "Karatsuba explanation",
+            provider=QueryEmbeddingProvider(),
+            index=index,
+            reranker=RecordingReranker([0.1, 0.8, 0.9]),
+            retrieval_top_k=3,
+            rerank_top_k=3,
+            final_top_k=3,
+        )
+
+    assert [(item.result_type, item.entity_id) for item in results] == [
+        ("slide", ids["second_page"]),
+        ("slide", ids["first_page"]),
+        ("note", ids["attached_note"]),
+    ]
 
 
 def test_search_and_rerank_applies_filters_before_reranking(
@@ -470,6 +504,7 @@ def test_search_and_rerank_empty_index_skips_both_models(
         ({"final_top_k": -1}, "final_top_k"),
         ({"retrieval_top_k": 2, "rerank_top_k": 3}, "rerank_top_k"),
         ({"rerank_top_k": 2, "final_top_k": 3}, "final_top_k"),
+        ({"reranker_weight": 1.1}, "reranker_weight"),
     ],
 )
 def test_search_and_rerank_rejects_invalid_limits_before_inference(

@@ -183,6 +183,7 @@ RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
 RETRIEVAL_TOP_K=20
 RERANK_TOP_K=20
 FINAL_TOP_K=5
+RERANKER_WEIGHT=0.6
 ```
 
 After importing lecture PDFs and adding notes, build or refresh the complete search index:
@@ -274,7 +275,9 @@ execution. Slide candidates use the rendered image together with extracted text 
 note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
 
 `search_and_rerank` connects the complete query path. By default it retrieves 20 vector-search
-candidates, sends up to 20 candidates to the reranker, and returns the best 5. Course and lecture
+candidates, sends up to 20 candidates to the reranker, fuses the embedding and reranker ranks
+with a 40/60 weighted reciprocal-rank score, and returns the best 5. Rank fusion avoids assuming
+that cosine similarities and reranker probabilities share a directly comparable scale. Course and lecture
 filters are applied before reranking, empty indexes avoid loading either model, and configuration
 requires `FINAL_TOP_K <= RERANK_TOP_K <= RETRIEVAL_TOP_K`.
 
@@ -303,6 +306,7 @@ results = search_and_rerank(
     retrieval_top_k=settings.retrieval_top_k,
     rerank_top_k=settings.rerank_top_k,
     final_top_k=settings.final_top_k,
+    reranker_weight=settings.reranker_weight,
 )
 ```
 
@@ -376,9 +380,11 @@ the current Transformers/MPS multi-image batch path produced non-finite float16 
 | Qwen Embedding | 0.740 | 0.900 | 1.000 | 0.816 | 304.7 ms |
 | Qwen + Reranker | 0.720 | 0.960 | 0.980 | 0.801 | 10,515.9 ms |
 
-The reranker improved Recall@5 but reduced R@1 and MRR on this first dataset. This makes
-reranker calibration, instructions, and candidate-depth tuning a measured follow-up rather than
-an assumed quality improvement.
+The pure reranker improved Recall@5 but reduced R@1 and MRR on this first dataset. A post-hoc
+weighted reciprocal-rank analysis of the saved page rankings selected the current 0.6 reranker
+weight: it preserved the embedding R@1, matched the reranker's R@5, and slightly improved MRR in
+that analysis. Re-run `python -m scripts.evaluate --reranker-weight 0.6` to measure the fused
+entity-level pipeline on local materials; the weight remains configurable rather than hard-coded.
 
 Private or copyrighted lecture materials will not be committed to the repository.
 

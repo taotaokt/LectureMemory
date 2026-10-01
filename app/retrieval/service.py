@@ -22,6 +22,7 @@ DEFAULT_TOP_K = 10
 DEFAULT_RETRIEVAL_TOP_K = 20
 DEFAULT_RERANK_TOP_K = 20
 DEFAULT_FINAL_TOP_K = 5
+DEFAULT_RERANKER_WEIGHT = 0.6
 DEFAULT_PREVIEW_LENGTH = 240
 
 
@@ -147,6 +148,7 @@ def search_and_rerank(
     retrieval_top_k: int = DEFAULT_RETRIEVAL_TOP_K,
     rerank_top_k: int = DEFAULT_RERANK_TOP_K,
     final_top_k: int = DEFAULT_FINAL_TOP_K,
+    reranker_weight: float = DEFAULT_RERANKER_WEIGHT,
     course_id: int | None = None,
     lecture_id: int | None = None,
 ) -> tuple[SearchResult, ...]:
@@ -156,6 +158,7 @@ def search_and_rerank(
         retrieval_top_k=retrieval_top_k,
         rerank_top_k=rerank_top_k,
         final_top_k=final_top_k,
+        reranker_weight=reranker_weight,
     )
     retrieved = search_lecture_memory(
         session,
@@ -174,6 +177,7 @@ def search_and_rerank(
         cleaned_query,
         rerank_candidates,
         top_k=final_top_k,
+        reranker_weight=reranker_weight,
     )
     logger.info(
         "Completed retrieval and reranking",
@@ -335,6 +339,7 @@ def _validate_pipeline_limits(
     retrieval_top_k: int,
     rerank_top_k: int,
     final_top_k: int,
+    reranker_weight: float,
 ) -> None:
     for field_name, value in (
         ("retrieval_top_k", retrieval_top_k),
@@ -347,6 +352,12 @@ def _validate_pipeline_limits(
         raise ValueError("rerank_top_k must not exceed retrieval_top_k")
     if final_top_k > rerank_top_k:
         raise ValueError("final_top_k must not exceed rerank_top_k")
+    if (
+        not isinstance(reranker_weight, (int, float))
+        or isinstance(reranker_weight, bool)
+        or not 0.0 <= float(reranker_weight) <= 1.0
+    ):
+        raise ValueError("reranker_weight must be a number between 0 and 1")
 
 
 def _validate_search_scope(

@@ -120,6 +120,34 @@ def test_top_k_is_applied_after_reranking() -> None:
     assert [result.rank for result in results] == [1, 2]
 
 
+def test_weighted_rank_fusion_combines_retrieval_and_reranker_order() -> None:
+    candidates = (
+        make_result(1, rank=1, raw_similarity=0.95),
+        make_result(2, rank=2, raw_similarity=0.90),
+        make_result(3, rank=3, raw_similarity=0.80),
+    )
+    reranker = MappingReranker({1: 0.1, 2: 0.8, 3: 0.9})
+
+    results = reranker.rerank("fused ranking", candidates, reranker_weight=0.6)
+
+    assert [result.entity_id for result in results] == [3, 1, 2]
+    assert [result.reranker_score for result in results] == [0.9, 0.1, 0.8]
+
+
+@pytest.mark.parametrize("reranker_weight", [-0.1, 1.1, True, "0.5"])
+def test_invalid_reranker_weight_is_rejected(reranker_weight: object) -> None:
+    reranker = MappingReranker({1: 0.5})
+
+    with pytest.raises(ValueError, match="reranker_weight"):
+        reranker.rerank(
+            "query",
+            [make_result(1, rank=1, raw_similarity=0.9)],
+            reranker_weight=reranker_weight,  # type: ignore[arg-type]
+        )
+
+    assert reranker.calls == []
+
+
 def test_empty_candidates_do_not_call_model() -> None:
     reranker = MappingReranker({})
 

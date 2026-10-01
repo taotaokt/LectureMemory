@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-k", type=int, default=10)
     parser.add_argument("--retrieval-top-k", type=int)
     parser.add_argument("--rerank-top-k", type=int)
+    parser.add_argument(
+        "--reranker-weight",
+        type=float,
+        help="Reranker contribution from 0 (embedding only) to 1 (reranker only).",
+    )
     parser.add_argument("--run-id", help="Optional stable output filename suffix.")
     return parser
 
@@ -80,12 +85,19 @@ def main() -> None:
     uses_embeddings = "embedding" in methods or "reranker" in methods
     retrieval_top_k = args.retrieval_top_k or max(settings.retrieval_top_k, args.max_k)
     rerank_top_k = args.rerank_top_k or max(settings.rerank_top_k, args.max_k)
+    reranker_weight = (
+        settings.reranker_weight
+        if args.reranker_weight is None
+        else args.reranker_weight
+    )
     if uses_embeddings and retrieval_top_k < args.max_k:
         raise SystemExit("--retrieval-top-k must be at least --max-k")
     if "reranker" in methods and not args.max_k <= rerank_top_k <= retrieval_top_k:
         raise SystemExit(
             "reranking requires --max-k <= --rerank-top-k <= --retrieval-top-k"
         )
+    if not 0.0 <= reranker_weight <= 1.0:
+        raise SystemExit("--reranker-weight must be between 0 and 1")
 
     queries = load_benchmark_queries(args.dataset)
     engine = create_database_engine(database_path)
@@ -226,6 +238,7 @@ def main() -> None:
                         reranked = reranker.rerank(
                             query.query,
                             candidates_by_query[query.id][:rerank_top_k],
+                            reranker_weight=reranker_weight,
                         )
                         reranking_ms = _elapsed_ms(started)
                         runs.append(
@@ -257,6 +270,7 @@ def main() -> None:
             "max_k": args.max_k,
             "retrieval_top_k": retrieval_top_k,
             "rerank_top_k": rerank_top_k,
+            "reranker_weight": reranker_weight if "reranker" in methods else None,
             "embedding_model": settings.model_name if uses_embeddings else None,
             "embedding_dimension": settings.embedding_dimension if uses_embeddings else None,
             "reranker_model": (

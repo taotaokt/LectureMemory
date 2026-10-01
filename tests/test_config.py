@@ -30,6 +30,7 @@ ENVIRONMENT_KEYS = (
     "RETRIEVAL_TOP_K",
     "RERANK_TOP_K",
     "FINAL_TOP_K",
+    "RERANKER_WEIGHT",
 )
 
 
@@ -66,6 +67,7 @@ def test_settings_load_defaults(monkeypatch) -> None:
     assert settings.retrieval_top_k == 20
     assert settings.rerank_top_k == 20
     assert settings.final_top_k == 5
+    assert settings.reranker_weight == pytest.approx(0.6)
 
 
 def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
@@ -98,6 +100,7 @@ def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("RETRIEVAL_TOP_K", "30")
     monkeypatch.setenv("RERANK_TOP_K", "12")
     monkeypatch.setenv("FINAL_TOP_K", "4")
+    monkeypatch.setenv("RERANKER_WEIGHT", "0.7")
 
     settings = Settings(_env_file=None)
 
@@ -123,6 +126,7 @@ def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
     assert settings.retrieval_top_k == 30
     assert settings.rerank_top_k == 12
     assert settings.final_top_k == 4
+    assert settings.reranker_weight == pytest.approx(0.7)
 
 
 @pytest.mark.parametrize(
@@ -134,6 +138,7 @@ def test_environment_overrides_settings(monkeypatch, tmp_path: Path) -> None:
             {"RERANKER_MIN_PIXELS": "8192", "RERANKER_MAX_PIXELS": "4096"},
             "reranker_max_pixels",
         ),
+        ({"RERANKER_WEIGHT": "1.1"}, "RERANKER_WEIGHT"),
     ],
 )
 def test_inconsistent_reranking_configuration_is_rejected(
