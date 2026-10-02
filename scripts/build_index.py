@@ -7,8 +7,8 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.database import create_database_engine, create_session_factory, session_scope
-from app.embeddings import EmbeddingCache, Qwen3VLEmbeddingProvider
-from app.services.indexing_service import IndexingProgress, build_search_index
+from app.services.indexing_runtime_service import build_configured_search_index
+from app.services.indexing_service import IndexingProgress
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,20 +40,14 @@ def main() -> None:
     if args.checkpoint_every <= 0:
         raise SystemExit("--checkpoint-every must be positive")
 
-    provider = Qwen3VLEmbeddingProvider(
-        model_name=settings.model_name,
-        device=settings.device,
-        dtype=settings.embedding_dtype,
-        dimension=settings.embedding_dimension,
-        batch_size=settings.embedding_batch_size,
-        max_pixels=settings.embedding_max_pixels,
-        query_instruction=settings.embedding_query_instruction,
-    )
-    cache = EmbeddingCache(embedding_dir)
+    if embedding_dir != settings.embedding_dir or index_dir != settings.index_dir:
+        settings = settings.model_copy(
+            update={"embedding_dir": embedding_dir, "index_dir": index_dir}
+        )
     engine = create_database_engine(database_path)
     factory = create_session_factory(engine)
     print(
-        f"Building {provider.model_name} index from {database_path} "
+        f"Building {settings.model_name} index from {database_path} "
         f"into {Path(index_dir).expanduser().resolve()}..."
     )
     try:
@@ -67,11 +61,9 @@ def main() -> None:
                 if progress.processed % args.checkpoint_every == 0:
                     session.commit()
 
-            summary = build_search_index(
+            summary = build_configured_search_index(
                 session,
-                provider=provider,
-                cache=cache,
-                index_dir=index_dir,
+                settings,
                 progress_callback=report_progress,
             )
     finally:

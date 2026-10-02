@@ -3,6 +3,7 @@
 import base64
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -110,6 +111,7 @@ def test_home_screen_can_create_and_open_course(monkeypatch, tmp_path: Path) -> 
     assert [item.label for item in app.expander] == [
         "Create lecture",
         "Upload lecture PDF",
+        "Search index",
     ]
     assert any(item.label == "Natural-language query" for item in app.text_input)
     assert any(item.label == "Filter lecture list" for item in app.text_input)
@@ -149,7 +151,7 @@ def test_course_page_can_create_and_filter_lectures(monkeypatch, tmp_path: Path)
     search_input[0].input("not present")
     app.run()
 
-    assert app.info[0].value == "No lectures match this search."
+    assert any(item.value == "No lectures match this search." for item in app.info)
 
 
 def test_home_screen_validates_required_course_fields(monkeypatch, tmp_path: Path) -> None:
@@ -162,6 +164,65 @@ def test_home_screen_validates_required_course_fields(monkeypatch, tmp_path: Pat
 
     assert not app.exception
     assert app.error[0].value == "Course name and code are required."
+
+
+def test_course_page_can_build_search_index_with_progress(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "index-controls.db"
+    app = build_app(monkeypatch, database_path).run()
+    create_and_open_course(app)
+
+    lecture_title = [item for item in app.text_input if item.label == "Lecture title"]
+    lecture_title[0].input("Search Trees")
+    [button for button in app.button if button.label == "Create lecture"][0].click()
+    app.run()
+
+    engine = create_database_engine(database_path)
+    factory = create_session_factory(engine)
+    with session_scope(factory) as session:
+        lecture = session.scalar(select(Lecture))
+        assert lecture is not None
+        create_note(session, lecture.id, NoteCreate(content="Remember tree rotations"))
+    engine.dispose()
+    calls: list[object] = []
+
+    def fake_build(session, settings, *, progress_callback):
+        calls.append(settings)
+        progress_callback(
+            SimpleNamespace(
+                processed=1,
+                total=1,
+                entity_type="note",
+                entity_id=1,
+                status="generated",
+            )
+        )
+        return SimpleNamespace(
+            complete=True,
+            indexed_entities=1,
+            total_entities=1,
+            generated_embeddings=1,
+            cached_embeddings=0,
+            failed_entities=0,
+        )
+
+    monkeypatch.setattr("frontend.streamlit_app.build_configured_search_index", fake_build)
+    app.run()
+    build_buttons = [
+        button for button in app.button if button.label == "Build or refresh search index"
+    ]
+    assert len(build_buttons) == 1
+    build_buttons[0].click()
+    app.run()
+
+    assert len(calls) == 1
+    assert not app.exception
+    assert any(
+        item.value == "Indexed 1 items: 1 generated and 0 reused."
+        for item in app.success
+    )
 
 
 def test_lecture_page_can_add_edit_and_navigate_from_notes(

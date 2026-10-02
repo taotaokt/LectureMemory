@@ -140,8 +140,9 @@ The app initializes missing SQLite tables automatically using `DATABASE_PATH`. T
 lists every course with its code and lecture count, supports creating a course, and records the
 selected course in the URL. A course workspace supports filtering and creating lectures, shows
 slide and note counts, and uploads PDFs through the validated ingestion pipeline. Uploading a PDF
-stores the source, renders its pages, and extracts its text; embedding and indexing remain
-separate explicit operations. Each lecture has a detail workspace for browsing rendered slides,
+stores the source, renders its pages, and extracts its text. The course workspace can then build
+or refresh the shared search index with visible per-item progress; unchanged embeddings are
+reused. Each lecture has a detail workspace for browsing rendered slides,
 reviewing extracted concepts, and adding or editing general or slide-specific notes. Course
 workspaces also expose natural-language search over the persisted FAISS index. Each result shows
 its course, lecture, page, preview, text, related notes, concepts, embedding similarity, and

@@ -30,6 +30,8 @@ from app.schemas import (
     SlidePageDisplay,
 )
 from app.services.course_service import create_course_from_input, list_course_summaries
+from app.services.indexing_runtime_service import build_configured_search_index
+from app.services.indexing_service import IndexingProgress
 from app.services.ingestion_service import DuplicateIngestionError
 from app.services.lecture_detail_service import (
     create_lecture_note,
@@ -166,6 +168,8 @@ def render_course_page(
         _render_create_lecture_form(session_factory, workspace)
     with st.expander("Upload lecture PDF"):
         _render_pdf_upload_form(session_factory, workspace, settings)
+    with st.expander("Search index"):
+        _render_index_controls(session_factory, workspace, settings)
 
     _render_course_search(session_factory, workspace, settings)
     st.divider()
@@ -525,6 +529,70 @@ def _render_course_search(
     st.markdown(f"#### Results for “{st.session_state[query_key]}”")
     for result in stored_results:
         _render_search_result(result)
+
+
+def _render_index_controls(
+    session_factory: sessionmaker[Session],
+    workspace: CourseWorkspace,
+    settings: Settings,
+) -> None:
+    searchable_items = sum(
+        lecture.slide_count + lecture.note_count for lecture in workspace.lectures
+    )
+    st.caption(
+        "Builds the shared search index for all courses. Unchanged embeddings are reused."
+    )
+    if searchable_items == 0:
+        st.info("Upload lecture slides or add notes before building the search index.")
+        return
+
+    st.write(f"This course currently has {searchable_items} searchable items.")
+    if not st.button(
+        "Build or refresh search index",
+        key=f"build-search-index-{workspace.course.id}",
+        width="stretch",
+    ):
+        return
+
+    progress_bar = st.progress(0.0, text="Preparing search index…")
+    with session_factory() as session:
+        try:
+            def report_progress(progress: IndexingProgress) -> None:
+                progress_bar.progress(
+                    progress.processed / progress.total,
+                    text=(
+                        f"Embedding {progress.processed}/{progress.total}: "
+                        f"{progress.entity_type} {progress.entity_id} ({progress.status})"
+                    ),
+                )
+                if progress.processed % 10 == 0:
+                    session.commit()
+
+            summary = build_configured_search_index(
+                session,
+                settings,
+                progress_callback=report_progress,
+            )
+            session.commit()
+        except (EmbeddingError, VectorIndexError, OSError, ValueError) as exc:
+            session.rollback()
+            progress_bar.empty()
+            st.error(f"Could not build the search index: {exc}")
+            return
+
+    _build_search_runtime.clear()
+    progress_bar.progress(1.0, text="Search index saved.")
+    if summary.complete:
+        st.success(
+            f"Indexed {summary.indexed_entities} items: "
+            f"{summary.generated_embeddings} generated and "
+            f"{summary.cached_embeddings} reused."
+        )
+    else:
+        st.warning(
+            f"Indexed {summary.indexed_entities}/{summary.total_entities} items; "
+            f"{summary.failed_entities} failed. Successful items remain searchable."
+        )
 
 
 def _execute_course_search(
