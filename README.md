@@ -1,5 +1,7 @@
 # Lecture Memory
 
+[![CI](https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml/badge.svg)](https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml)
+
 Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
 
 > **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
