@@ -43,6 +43,7 @@ data/rendered/**
 data/embeddings/**
 data/indexes/**
 data/database/**
+data/demo/**
 !data/raw/.gitkeep
 !data/rendered/.gitkeep
 !data/embeddings/.gitkeep

@@ -12,6 +12,17 @@ Lecture Memory is a local, multimodal study-memory system designed to help stude
 > three real course PDFs, with BM25, multimodal embedding, reranking, quality metrics, and
 > per-stage latency evaluation available from one command.
 
+## Demo
+
+The screenshots below use the repository's synthetic machine-learning demo workspace; no private
+lecture material is included.
+
+![Lecture Memory course list](docs/images/demo-home.jpg)
+
+![Course workspace with a current multimodal search index](docs/images/demo-course.jpg)
+
+![Natural-language search returning a related note and slide](docs/images/demo-search.jpg)
+
 ## Why Lecture Memory?
 
 Students often remember *seeing* a diagram, equation, explanation, or handwritten note without remembering where it came from. Traditional keyword search is often ineffective when the useful information is contained in visual layouts, mathematical notation, screenshots, or personal shorthand.
@@ -138,6 +149,19 @@ Start the local interface:
 ```bash
 streamlit run streamlit_app.py
 ```
+
+To explore a public synthetic course instead of importing personal material, prepare the
+idempotent demo workspace and start Streamlit against its isolated data directory:
+
+```bash
+python -m scripts.prepare_demo
+DATA_DIR=data/demo python -m scripts.build_index
+DATA_DIR=data/demo streamlit run streamlit_app.py
+```
+
+The demo contains three generated slides and two notes about gradient descent, learning rates,
+and L2 regularization. Building its index uses the same optional Qwen runtime as real course
+material.
 
 The app initializes missing SQLite tables automatically using `DATABASE_PATH`. The home screen
 lists every course with its code and lecture count, supports creating a course, and records the
