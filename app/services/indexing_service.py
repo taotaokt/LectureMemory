@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
@@ -76,6 +77,28 @@ class IndexBuildSummary:
         return self.indexed_entities == self.total_entities and not self.failures
 
 
+@dataclass(frozen=True, slots=True)
+class SearchSourceSnapshot:
+    """Content fingerprint for every slide and note currently in the database."""
+
+    signature: str
+    entity_count: int
+
+
+def get_search_source_snapshot(session: Session) -> SearchSourceSnapshot:
+    """Hash the current searchable content without loading an embedding model."""
+    slides, notes = _load_search_sources(session)
+    fingerprints = [
+        ("slide_page", slide.id, hash_file(Path(slide.image_path).expanduser().resolve()))
+        for slide in slides
+    ]
+    fingerprints.extend(("note", note.id, hash_text(note.content)) for note in notes)
+    return SearchSourceSnapshot(
+        signature=_source_signature(fingerprints),
+        entity_count=len(fingerprints),
+    )
+
+
 def build_search_index(
     session: Session,
     *,
@@ -85,23 +108,11 @@ def build_search_index(
     progress_callback: Callable[[IndexingProgress], None] | None = None,
 ) -> IndexBuildSummary:
     """Embed every current slide and note, then atomically replace the index."""
-    slides = tuple(
-        session.scalars(
-            select(SlidePage).order_by(
-                SlidePage.lecture_id,
-                SlidePage.page_number,
-                SlidePage.id,
-            )
-        ).all()
-    )
-    notes = tuple(
-        session.scalars(
-            select(Note).order_by(Note.lecture_id, Note.created_at, Note.id)
-        ).all()
-    )
+    slides, notes = _load_search_sources(session)
 
     vectors = []
     entities: list[IndexedEntity] = []
+    fingerprints: list[tuple[EmbeddingEntityType, int, str]] = []
     failures: list[IndexingFailure] = []
     generated_embeddings = 0
     cached_embeddings = 0
@@ -145,6 +156,7 @@ def build_search_index(
             continue
         vectors.append(result.vector)
         entities.append(IndexedEntity("slide_page", slide.id))
+        fingerprints.append(("slide_page", slide.id, content_hash))
         indexed_slides += 1
         generated_embeddings += int(not result.cache_hit)
         cached_embeddings += int(result.cache_hit)
@@ -192,6 +204,7 @@ def build_search_index(
             continue
         vectors.append(result.vector)
         entities.append(IndexedEntity("note", note.id))
+        fingerprints.append(("note", note.id, content_hash))
         indexed_notes += 1
         generated_embeddings += int(not result.cache_hit)
         cached_embeddings += int(result.cache_hit)
@@ -210,6 +223,8 @@ def build_search_index(
         dimension=provider.dimension,
         vectors=vectors,
         entities=entities,
+        model_name=provider.model_name,
+        source_signature=_source_signature(fingerprints),
     )
     index.save(destination)
 
@@ -239,6 +254,36 @@ def build_search_index(
         },
     )
     return summary
+
+
+def _load_search_sources(session: Session) -> tuple[tuple[SlidePage, ...], tuple[Note, ...]]:
+    slides = tuple(
+        session.scalars(
+            select(SlidePage).order_by(
+                SlidePage.lecture_id,
+                SlidePage.page_number,
+                SlidePage.id,
+            )
+        ).all()
+    )
+    notes = tuple(
+        session.scalars(select(Note).order_by(Note.lecture_id, Note.created_at, Note.id)).all()
+    )
+    return slides, notes
+
+
+def _source_signature(
+    fingerprints: list[tuple[EmbeddingEntityType, int, str]],
+) -> str:
+    digest = sha256()
+    for entity_type, entity_id, content_hash in fingerprints:
+        digest.update(entity_type.encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(entity_id).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(content_hash.encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def _failure(

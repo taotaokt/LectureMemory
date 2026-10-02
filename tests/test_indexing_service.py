@@ -22,7 +22,11 @@ from app.repositories.note_repository import create_note
 from app.repositories.slide_page_repository import create_slide_page
 from app.retrieval import FaissVectorIndex
 from app.schemas import CourseCreate, LectureCreate, NoteCreate, SlidePageCreate
-from app.services.indexing_service import IndexingProgress, build_search_index
+from app.services.indexing_service import (
+    IndexingProgress,
+    build_search_index,
+    get_search_source_snapshot,
+)
 
 
 class IndexEmbeddingProvider(EmbeddingProvider):
@@ -137,8 +141,7 @@ def test_build_generates_then_reuses_embeddings(
 
     index = FaissVectorIndex.load(index_dir)
     indexed_entities = {
-        (result.entity_type, result.entity_id)
-        for result in index.search([1.0, 1.0, 1.0], top_k=10)
+        (result.entity_type, result.entity_id) for result in index.search([1.0, 1.0, 1.0], top_k=10)
     }
 
     assert first.complete is True
@@ -156,10 +159,38 @@ def test_build_generates_then_reuses_embeddings(
     assert provider.image_calls == [image.resolve() for image in images]
     assert provider.text_calls == ["Balanced tree", "Rotation invariant"]
     assert index.count == 4
+    assert index.model_name == provider.model_name
+    assert index.source_signature is not None
     assert indexed_entities == {
-        *(('slide_page', slide_id) for slide_id in slide_ids),
-        *(('note', note_id) for note_id in note_ids),
+        *(("slide_page", slide_id) for slide_id in slide_ids),
+        *(("note", note_id) for note_id in note_ids),
     }
+
+
+def test_source_snapshot_changes_with_note_and_slide_content(
+    indexing_session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    _, note_ids, images = create_search_content(
+        indexing_session_factory,
+        tmp_path / "slides",
+    )
+    with session_scope(indexing_session_factory) as session:
+        original = get_search_source_snapshot(session)
+        note = session.get(Note, note_ids[0])
+        assert note is not None
+        note.content = "Updated balanced-tree note"
+    with session_scope(indexing_session_factory) as session:
+        note_changed = get_search_source_snapshot(session)
+
+    images[0].write_bytes(b"updated slide")
+    with session_scope(indexing_session_factory) as session:
+        slide_changed = get_search_source_snapshot(session)
+
+    assert original.entity_count == 4
+    assert note_changed.entity_count == 4
+    assert original.signature != note_changed.signature
+    assert note_changed.signature != slide_changed.signature
 
 
 def test_full_rebuild_drops_deleted_entities(
@@ -193,8 +224,7 @@ def test_full_rebuild_drops_deleted_entities(
 
     index = FaissVectorIndex.load(index_dir)
     indexed_entities = {
-        (result.entity_type, result.entity_id)
-        for result in index.search([1.0, 1.0, 1.0], top_k=10)
+        (result.entity_type, result.entity_id) for result in index.search([1.0, 1.0, 1.0], top_k=10)
     }
 
     assert summary.total_entities == 3
@@ -228,8 +258,7 @@ def test_entity_failure_is_isolated_and_partial_index_is_saved(
 
     index = FaissVectorIndex.load(index_dir)
     indexed_entities = {
-        (result.entity_type, result.entity_id)
-        for result in index.search([1.0, 1.0, 1.0], top_k=10)
+        (result.entity_type, result.entity_id) for result in index.search([1.0, 1.0, 1.0], top_k=10)
     }
 
     assert summary.complete is False
@@ -242,6 +271,8 @@ def test_entity_failure_is_isolated_and_partial_index_is_saved(
         ("note", note_ids[0]),
     }
     assert index.count == 2
+    assert index.model_name == provider.model_name
+    assert index.source_signature is not None
     assert indexed_entities == {
         ("slide_page", slide_ids[0]),
         ("note", note_ids[1]),

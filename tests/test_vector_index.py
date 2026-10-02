@@ -75,14 +75,23 @@ def test_save_and_load_preserve_search_and_allow_incremental_add(
     tmp_path: Path,
 ) -> None:
     snapshot = tmp_path / "index"
+    source_signature = "a" * 64
     original = FaissVectorIndex.build(
         dimension=3,
         vectors=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
         entities=[IndexedEntity("slide_page", 7), IndexedEntity("note", 8)],
+        model_name="test/embedding-model",
+        source_signature=source_signature,
     )
     original.save(snapshot)
 
     loaded = FaissVectorIndex.load(snapshot)
+    assert loaded.model_name == "test/embedding-model"
+    assert loaded.source_signature == source_signature
+    assert loaded.entities == (
+        IndexedEntity("slide_page", 7),
+        IndexedEntity("note", 8),
+    )
     new_ids = loaded.add([[0.0, 0.0, 1.0]], [IndexedEntity("note", 9)])
     results = loaded.search([0.0, 0.0, 2.0], top_k=5)
 
@@ -90,12 +99,36 @@ def test_save_and_load_preserve_search_and_allow_incremental_add(
     assert (snapshot / METADATA_FILENAME).is_file()
     assert loaded.dimension == 3
     assert loaded.count == 3
+    assert loaded.source_signature is None
     assert new_ids == (2,)
     assert results[0].entity_type == "note"
     assert results[0].entity_id == 9
     assert results[0].score == pytest.approx(1.0)
     assert len(results) == 3
     assert not list(snapshot.glob("*.tmp"))
+
+
+def test_load_supports_legacy_metadata_without_freshness_fields(tmp_path: Path) -> None:
+    index = FaissVectorIndex.build(
+        dimension=2,
+        vectors=[[1.0, 0.0]],
+        entities=[IndexedEntity("note", 1)],
+        model_name="test/model",
+        source_signature="b" * 64,
+    )
+    index.save(tmp_path)
+    metadata_path = tmp_path / METADATA_FILENAME
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["version"] = 1
+    metadata.pop("model_name")
+    metadata.pop("source_signature")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    loaded = FaissVectorIndex.load(tmp_path)
+
+    assert loaded.count == 1
+    assert loaded.model_name is None
+    assert loaded.source_signature is None
 
 
 def test_empty_index_can_be_searched_and_round_tripped(tmp_path: Path) -> None:

@@ -30,7 +30,8 @@ from app.schemas import EmbeddingEntityType
 
 INDEX_FILENAME = "vectors.faiss"
 METADATA_FILENAME = "metadata.json"
-METADATA_VERSION = 1
+METADATA_VERSION = 2
+SUPPORTED_METADATA_VERSIONS = {1, METADATA_VERSION}
 SUPPORTED_ENTITY_TYPES = {"slide_page", "note"}
 
 
@@ -81,8 +82,16 @@ class VectorSearchResult:
 class FaissVectorIndex:
     """Exact cosine-similarity index with durable entity mappings."""
 
-    def __init__(self, dimension: int) -> None:
+    def __init__(
+        self,
+        dimension: int,
+        *,
+        model_name: str | None = None,
+        source_signature: str | None = None,
+    ) -> None:
         self._dimension = self._validate_dimension(dimension)
+        self._model_name = self._validate_optional_text(model_name, field_name="model_name")
+        self._source_signature = self._validate_optional_signature(source_signature)
         self._index = faiss.IndexIDMap2(faiss.IndexFlatIP(self._dimension))
         self._entities_by_vector_id: dict[int, IndexedEntity] = {}
         self._vector_ids_by_entity: dict[IndexedEntity, int] = {}
@@ -98,6 +107,21 @@ class FaissVectorIndex:
         """Return the number of indexed entities."""
         return len(self._entities_by_vector_id)
 
+    @property
+    def model_name(self) -> str | None:
+        """Return the embedding model recorded for this snapshot, when available."""
+        return self._model_name
+
+    @property
+    def source_signature(self) -> str | None:
+        """Return the database-content signature recorded for this snapshot."""
+        return self._source_signature
+
+    @property
+    def entities(self) -> tuple[IndexedEntity, ...]:
+        """Return indexed entities in stable vector-ID order."""
+        return tuple(entity for _, entity in sorted(self._entities_by_vector_id.items()))
+
     @classmethod
     def build(
         cls,
@@ -105,10 +129,17 @@ class FaissVectorIndex:
         dimension: int,
         vectors: ArrayLike,
         entities: list[IndexedEntity] | tuple[IndexedEntity, ...],
+        model_name: str | None = None,
+        source_signature: str | None = None,
     ) -> Self:
         """Build a new index from a complete vector and entity collection."""
         index = cls(dimension)
         index.add(vectors, entities)
+        index._model_name = cls._validate_optional_text(
+            model_name,
+            field_name="model_name",
+        )
+        index._source_signature = cls._validate_optional_signature(source_signature)
         return index
 
     def add(
@@ -137,6 +168,7 @@ class FaissVectorIndex:
             self._entities_by_vector_id[vector_id] = entity
             self._vector_ids_by_entity[entity] = vector_id
         self._next_vector_id += len(entity_batch)
+        self._source_signature = None
         return tuple(int(vector_id) for vector_id in vector_ids)
 
     def search(self, query: ArrayLike, *, top_k: int) -> tuple[VectorSearchResult, ...]:
@@ -160,9 +192,7 @@ class FaissVectorIndex:
         ):
             entity = self._entities_by_vector_id.get(int(vector_id))
             if entity is None:
-                raise IndexPersistenceError(
-                    f"FAISS returned unmapped vector ID {int(vector_id)}"
-                )
+                raise IndexPersistenceError(f"FAISS returned unmapped vector ID {int(vector_id)}")
             results.append(
                 VectorSearchResult(
                     entity_type=entity.entity_type,
@@ -236,7 +266,13 @@ class FaissVectorIndex:
 
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            dimension, next_vector_id, entities_by_vector_id = cls._parse_metadata(metadata)
+            (
+                dimension,
+                next_vector_id,
+                entities_by_vector_id,
+                model_name,
+                source_signature,
+            ) = cls._parse_metadata(metadata)
             faiss_index = faiss.read_index(str(index_path))
             cls._validate_loaded_faiss_index(
                 faiss_index,
@@ -257,6 +293,8 @@ class FaissVectorIndex:
             entity: vector_id for vector_id, entity in entities_by_vector_id.items()
         }
         instance._next_vector_id = next_vector_id
+        instance._model_name = model_name
+        instance._source_signature = source_signature
         return instance
 
     def _prepare_matrix(self, vectors: ArrayLike, *, rows: int) -> NDArray[np.float32]:
@@ -265,8 +303,7 @@ class FaissVectorIndex:
             return np.empty((0, self.dimension), dtype=np.float32)
         if raw_matrix.ndim != 2 or raw_matrix.shape != (rows, self.dimension):
             raise InvalidVectorError(
-                f"Vector batch shape is {raw_matrix.shape}; "
-                f"expected ({rows}, {self.dimension})"
+                f"Vector batch shape is {raw_matrix.shape}; expected ({rows}, {self.dimension})"
             )
         if not np.isfinite(raw_matrix).all():
             raise InvalidVectorError("Vector batch contains non-finite values")
@@ -303,6 +340,8 @@ class FaissVectorIndex:
         return {
             "version": METADATA_VERSION,
             "dimension": self.dimension,
+            "model_name": self.model_name,
+            "source_signature": self.source_signature,
             "next_vector_id": self._next_vector_id,
             "entities": [
                 {
@@ -318,10 +357,34 @@ class FaissVectorIndex:
     def _parse_metadata(
         cls,
         metadata: Any,
-    ) -> tuple[int, int, dict[int, IndexedEntity]]:
-        if not isinstance(metadata, dict) or metadata.get("version") != METADATA_VERSION:
+    ) -> tuple[
+        int,
+        int,
+        dict[int, IndexedEntity],
+        str | None,
+        str | None,
+    ]:
+        if (
+            not isinstance(metadata, dict)
+            or metadata.get("version") not in SUPPORTED_METADATA_VERSIONS
+        ):
             raise IndexPersistenceError("Unsupported or missing index metadata version")
+        version = metadata["version"]
         dimension = cls._validate_dimension(metadata.get("dimension"))
+        if version == 1:
+            model_name = None
+            source_signature = None
+        else:
+            try:
+                model_name = cls._validate_optional_text(
+                    metadata.get("model_name"),
+                    field_name="model_name",
+                )
+                source_signature = cls._validate_optional_signature(
+                    metadata.get("source_signature")
+                )
+            except (TypeError, ValueError) as exc:
+                raise IndexPersistenceError(f"Invalid snapshot metadata: {exc}") from exc
         next_vector_id = metadata.get("next_vector_id")
         if (
             not isinstance(next_vector_id, int)
@@ -361,7 +424,13 @@ class FaissVectorIndex:
         minimum_next_id = max(entities_by_vector_id, default=-1) + 1
         if next_vector_id < minimum_next_id:
             raise IndexPersistenceError("next_vector_id overlaps an existing vector ID")
-        return dimension, next_vector_id, entities_by_vector_id
+        return (
+            dimension,
+            next_vector_id,
+            entities_by_vector_id,
+            model_name,
+            source_signature,
+        )
 
     @staticmethod
     def _validate_loaded_faiss_index(
@@ -384,10 +453,26 @@ class FaissVectorIndex:
 
     @staticmethod
     def _validate_dimension(dimension: Any) -> int:
-        if (
-            not isinstance(dimension, int)
-            or isinstance(dimension, bool)
-            or dimension <= 0
-        ):
+        if not isinstance(dimension, int) or isinstance(dimension, bool) or dimension <= 0:
             raise InvalidVectorError("dimension must be a positive integer")
         return dimension
+
+    @staticmethod
+    def _validate_optional_text(value: Any, *, field_name: str) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{field_name} must be a non-blank string or None")
+        return value.strip()
+
+    @staticmethod
+    def _validate_optional_signature(value: Any) -> str | None:
+        if value is None:
+            return None
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise ValueError("source_signature must be a lowercase SHA-256 hex digest or None")
+        return value

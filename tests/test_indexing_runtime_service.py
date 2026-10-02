@@ -6,7 +6,12 @@ from types import SimpleNamespace
 import pytest
 
 from app.config import Settings
-from app.services.indexing_runtime_service import build_configured_search_index
+from app.retrieval import IndexPersistenceError
+from app.services.indexing_runtime_service import (
+    build_configured_search_index,
+    get_search_index_status,
+)
+from app.services.indexing_service import SearchSourceSnapshot
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -52,6 +57,7 @@ def test_configured_index_build_forwards_model_and_storage_settings(
         "app.services.indexing_runtime_service.build_search_index",
         fake_build,
     )
+
     def callback(progress) -> None:
         del progress
 
@@ -79,6 +85,88 @@ def test_configured_index_build_forwards_model_and_storage_settings(
     assert captured["cache"] is cache
     assert captured["index_dir"] == settings.index_dir
     assert captured["progress_callback"] is callback
+
+
+def test_index_status_reports_current_snapshot(monkeypatch, tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+    index = SimpleNamespace(
+        count=4,
+        dimension=settings.embedding_dimension,
+        model_name=settings.model_name,
+        source_signature="a" * 64,
+    )
+    monkeypatch.setattr(
+        "app.services.indexing_runtime_service.FaissVectorIndex.load",
+        lambda path: index,
+    )
+    monkeypatch.setattr(
+        "app.services.indexing_runtime_service.get_search_source_snapshot",
+        lambda session: SearchSourceSnapshot("a" * 64, 4),
+    )
+
+    status = get_search_index_status(SimpleNamespace(), settings)
+
+    assert status.state == "current"
+    assert status.indexed_entities == 4
+    assert status.current_entities == 4
+
+
+@pytest.mark.parametrize(
+    ("index_updates", "reason"),
+    [
+        ({"source_signature": "b" * 64}, "Slides or notes have changed"),
+        ({"model_name": "another/model"}, "embedding model has changed"),
+        ({"dimension": 128}, "embedding dimension has changed"),
+        ({"source_signature": None}, "predates freshness metadata"),
+    ],
+)
+def test_index_status_reports_stale_snapshot(
+    monkeypatch,
+    tmp_path: Path,
+    index_updates: dict[str, object],
+    reason: str,
+) -> None:
+    settings = make_settings(tmp_path)
+    index_values = {
+        "count": 3,
+        "dimension": settings.embedding_dimension,
+        "model_name": settings.model_name,
+        "source_signature": "a" * 64,
+        **index_updates,
+    }
+    monkeypatch.setattr(
+        "app.services.indexing_runtime_service.FaissVectorIndex.load",
+        lambda path: SimpleNamespace(**index_values),
+    )
+    monkeypatch.setattr(
+        "app.services.indexing_runtime_service.get_search_source_snapshot",
+        lambda session: SearchSourceSnapshot("a" * 64, 4),
+    )
+
+    status = get_search_index_status(SimpleNamespace(), settings)
+
+    assert status.state == "stale"
+    assert reason in status.reason
+    assert status.indexed_entities == 3
+    assert status.current_entities == 4
+
+
+def test_index_status_reports_missing_snapshot(monkeypatch, tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+
+    def fail_load(path):
+        raise IndexPersistenceError(f"missing: {path}")
+
+    monkeypatch.setattr(
+        "app.services.indexing_runtime_service.FaissVectorIndex.load",
+        fail_load,
+    )
+
+    status = get_search_index_status(SimpleNamespace(), settings)
+
+    assert status.state == "missing"
+    assert status.indexed_entities == 0
+    assert status.current_entities is None
 
 
 @pytest.mark.parametrize("field", ["embedding_dir", "index_dir"])

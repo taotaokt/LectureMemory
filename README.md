@@ -103,6 +103,7 @@ Planned core stack:
 - [x] Streamlit lecture detail, slide browsing, and note editing
 - [x] Streamlit course search and ranked result screen
 - [x] Unified database-to-FAISS index build command
+- [x] Search-index freshness detection for source, model, and dimension changes
 - [x] 50-query bilingual retrieval benchmark with source-page validation
 - [x] Bilingual BM25 lexical baseline
 - [x] Recall@1/5/10 and MRR evaluation runner
@@ -142,7 +143,9 @@ selected course in the URL. A course workspace supports filtering and creating l
 slide and note counts, and uploads PDFs through the validated ingestion pipeline. Uploading a PDF
 stores the source, renders its pages, and extracts its text. The course workspace can then build
 or refresh the shared search index with visible per-item progress; unchanged embeddings are
-reused. Each lecture has a detail workspace for browsing rendered slides,
+reused. It also reports whether the index is missing, out of date, or current by comparing the
+saved model and content fingerprint with the live slides and notes. Each lecture has a detail
+workspace for browsing rendered slides,
 reviewing extracted concepts, and adding or editing general or slide-specific notes. Course
 workspaces also expose natural-language search over the persisted FAISS index. Each result shows
 its course, lecture, page, preview, text, related notes, concepts, embedding similarity, and

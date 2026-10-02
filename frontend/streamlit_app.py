@@ -30,7 +30,10 @@ from app.schemas import (
     SlidePageDisplay,
 )
 from app.services.course_service import create_course_from_input, list_course_summaries
-from app.services.indexing_runtime_service import build_configured_search_index
+from app.services.indexing_runtime_service import (
+    build_configured_search_index,
+    get_search_index_status,
+)
 from app.services.indexing_service import IndexingProgress
 from app.services.ingestion_service import DuplicateIngestionError
 from app.services.lecture_detail_service import (
@@ -201,10 +204,7 @@ def render_course_page(
                 )
                 slide_label = "slide" if lecture.slide_count == 1 else "slides"
                 note_label = "note" if lecture.note_count == 1 else "notes"
-                st.write(
-                    f"{lecture.slide_count} {slide_label} · "
-                    f"{lecture.note_count} {note_label}"
-                )
+                st.write(f"{lecture.slide_count} {slide_label} · {lecture.note_count} {note_label}")
             with status:
                 st.caption("PDF ready" if lecture.source_pdf else "No PDF uploaded")
                 if st.button(
@@ -240,8 +240,7 @@ def render_lecture_page(
             else "Date not set"
         )
         st.caption(
-            f"{workspace.course.code} · Lecture "
-            f"{workspace.lecture.lecture_number} · {date_label}"
+            f"{workspace.course.code} · Lecture {workspace.lecture.lecture_number} · {date_label}"
         )
     with navigation:
         if st.button("Back to course", width="stretch"):
@@ -331,13 +330,16 @@ def _render_add_note_form(
                 content=content,
                 page_id=page_id,
             )
-    except (LectureNotFoundError, SlidePageNotFoundError, NotePageMismatchError, ValidationError) as exc:
+    except (
+        LectureNotFoundError,
+        SlidePageNotFoundError,
+        NotePageMismatchError,
+        ValidationError,
+    ) as exc:
         st.error(_validation_message(exc, fallback="A note cannot be empty."))
         return
 
-    st.session_state[f"lecture_notice_{workspace.lecture.id}"] = (
-        f"Added note {note.id}."
-    )
+    st.session_state[f"lecture_notice_{workspace.lecture.id}"] = f"Added note {note.id}."
     st.rerun()
 
 
@@ -403,9 +405,7 @@ def _render_edit_note_form(
         st.error(_validation_message(exc, fallback="A note cannot be empty."))
         return
 
-    st.session_state[f"lecture_notice_{workspace.lecture.id}"] = (
-        f"Updated note {note.id}."
-    )
+    st.session_state[f"lecture_notice_{workspace.lecture.id}"] = f"Updated note {note.id}."
     st.rerun()
 
 
@@ -539,14 +539,21 @@ def _render_index_controls(
     searchable_items = sum(
         lecture.slide_count + lecture.note_count for lecture in workspace.lectures
     )
-    st.caption(
-        "Builds the shared search index for all courses. Unchanged embeddings are reused."
-    )
+    st.caption("Builds the shared search index for all courses. Unchanged embeddings are reused.")
     if searchable_items == 0:
         st.info("Upload lecture slides or add notes before building the search index.")
         return
 
     st.write(f"This course currently has {searchable_items} searchable items.")
+    with session_factory() as session:
+        index_status = get_search_index_status(session, settings)
+    if index_status.state == "current":
+        st.success(f"Search index is up to date ({index_status.indexed_entities} items).")
+    elif index_status.state == "stale":
+        st.warning(f"Search index needs a refresh. {index_status.reason}.")
+    else:
+        st.warning("Search index has not been built yet.")
+
     if not st.button(
         "Build or refresh search index",
         key=f"build-search-index-{workspace.course.id}",
@@ -557,6 +564,7 @@ def _render_index_controls(
     progress_bar = st.progress(0.0, text="Preparing search index…")
     with session_factory() as session:
         try:
+
             def report_progress(progress: IndexingProgress) -> None:
                 progress_bar.progress(
                     progress.processed / progress.total,
@@ -690,8 +698,7 @@ def _render_pdf_upload_form(
             "Lecture",
             options=list(lecture_by_id),
             format_func=lambda identifier: (
-                f"{lecture_by_id[identifier].lecture_number}. "
-                f"{lecture_by_id[identifier].title}"
+                f"{lecture_by_id[identifier].lecture_number}. {lecture_by_id[identifier].title}"
             ),
         )
         uploaded_file = st.file_uploader("PDF file", type=["pdf"])
@@ -716,13 +723,18 @@ def _render_pdf_upload_form(
                 raw_root=settings.data_dir / "raw",
                 rendered_root=settings.rendered_dir,
             )
-    except (DuplicateIngestionError, PDFProcessingError, PDFRenderError, ValueError, OSError) as exc:
+    except (
+        DuplicateIngestionError,
+        PDFProcessingError,
+        PDFRenderError,
+        ValueError,
+        OSError,
+    ) as exc:
         st.error(f"Could not upload PDF: {exc}")
         return
 
     st.session_state[f"course_notice_{workspace.course.id}"] = (
-        f"Uploaded {summary.total_pages} pages for "
-        f"{lecture_by_id[lecture_id].title}."
+        f"Uploaded {summary.total_pages} pages for {lecture_by_id[lecture_id].title}."
     )
     st.rerun()
 
@@ -737,8 +749,7 @@ def _filter_lectures(
     return tuple(
         lecture
         for lecture in lectures
-        if cleaned_query in lecture.title.casefold()
-        or cleaned_query in str(lecture.lecture_number)
+        if cleaned_query in lecture.title.casefold() or cleaned_query in str(lecture.lecture_number)
     )
 
 
