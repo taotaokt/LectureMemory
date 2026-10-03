@@ -2,7 +2,7 @@
 
 All notable changes to Lecture Memory are documented here.
 
-## [0.1.0] - 2026-10-02
+## [0.1.0] - 2026-10-03
 
 ### Added
 
