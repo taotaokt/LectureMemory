@@ -1,132 +1,75 @@
-# Lecture Memory
+<h1 align="center">Lecture Memory</h1>
 
-[![CI](https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml/badge.svg)](https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml)
+<p align="center"><strong>Remember the idea. Find the slide.</strong></p>
 
-Lecture Memory is a local, multimodal study-memory system designed to help students find where an idea appeared across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page.
+<p align="center">
+  <a href="https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml"><img src="https://github.com/taotaokt/LectureMemory/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/status-research%20prototype-orange" alt="Research prototype">
+</p>
 
-> **Development status:** Early-stage implementation. PDF ingestion, multimodal embedding,
-> persistent indexing, filtered retrieval, the configured Qwen reranking workflow, and local
-> concept extraction and display data are available. The Streamlit course home and course
-> workspace are usable, including lecture slide browsing, note editing, course-scoped natural-
-> language search, and ranked result cards. A validated 50-query bilingual benchmark covers
-> three real course PDFs, with BM25, multimodal embedding, reranking, quality metrics, and
-> per-stage latency evaluation available from one command.
+<p align="center">
+  <a href="#demo">Demo</a> ·
+  <a href="#how-it-works">How It Works</a> ·
+  <a href="#getting-started">Getting Started</a> ·
+  <a href="#evaluation">Evaluation</a> ·
+  <a href="#welcome">Welcome</a> ·
+  <a href="#license">License</a>
+</p>
+
+Lecture Memory helps students find ideas across lecture slides and personal notes—even when they cannot remember the exact wording, lecture, or page. Describe a concept, diagram, or explanation in your own words, and return to the original material with its course, lecture, and page context.
+
+The project explores a practical question: **can search recover what a student remembers seeing, rather than only the words they remember reading?** It brings together visual and text retrieval in a local study workspace, with a bilingual benchmark to measure retrieval quality.
+
+## What You Can Do
+
+- **Keep courses organized.** Group lecture PDFs and personal notes by course and lecture.
+- **Search the way you remember.** Ask about an idea, equation, or visual without knowing its exact title.
+- **Find slides and notes together.** Review ranked matches with slide previews and source context.
+- **Connect notes to the material.** Add lecture-wide notes or attach them to a specific slide.
+- **Choose a search mode.** Use fast search for quicker lookup, or enable reranking for a second relevance check.
+- **Work with local materials.** Store your imported PDFs, notes, and search index on your own machine.
+
+> **Status:** Working research prototype. Course organization, PDF upload, slide browsing, note editing, index building, and natural-language search are implemented. Search quality and speed remain areas for improvement.
 
 ## Demo
 
-The screenshots below use the repository's synthetic machine-learning demo workspace; no private
-lecture material is included.
+The screenshots use a synthetic machine-learning course. No private lecture material is included.
+
+**Organize your courses**
 
 ![Lecture Memory course list](docs/images/demo-home.jpg)
 
-![Course workspace with a current multimodal search index](docs/images/demo-course.jpg)
+**Browse slides and keep related notes in one workspace**
+
+![Course workspace with a current search index](docs/images/demo-course.jpg)
+
+**Find relevant slides and notes from a natural-language query**
 
 ![Natural-language search returning a related note and slide](docs/images/demo-search.jpg)
 
-## Why Lecture Memory?
+## How It Works
 
-Students often remember *seeing* a diagram, equation, explanation, or handwritten note without remembering where it came from. Traditional keyword search is often ineffective when the useful information is contained in visual layouts, mathematical notation, screenshots, or personal shorthand.
+1. **Bring in your materials.** Create a course and lecture, upload a PDF, and add notes while reviewing the slides.
+2. **Make them searchable.** Build the search index. Lecture Memory represents slide images and note text in a shared searchable space, allowing visual content and written ideas to be matched to a query.
+3. **Describe what you remember.** Search within a course using a question or short description. You can also enable multimodal reranking to reassess the initial matches.
+4. **Return to the source.** Open the matching lecture and slide, inspect the preview, and read the associated notes.
 
-Lecture Memory is intended to create a persistent, searchable memory organized around courses and lectures rather than isolated documents.
-
-Example searches:
+Try queries such as:
 
 ```text
 Where did the professor explain convex sets?
 Find the slide showing convex and non-convex shapes.
-When did we discuss three-subproblem integer multiplication?
 Find my note about why Karatsuba is faster.
 ```
 
-## Planned Experience
-
-The first complete version will allow a student to:
-
-- organize materials by course and lecture;
-- upload lecture PDFs and render individual slide pages;
-- attach notes to a lecture or a specific slide;
-- search slides and notes with natural-language queries;
-- retrieve visually or semantically relevant pages;
-- rerank results and inspect the corresponding slide preview;
-- evaluate retrieval quality with a reproducible benchmark.
-
-Lecture Memory is a retrieval system, not a generic PDF chatbot. Answer generation, lecture recording, transcription, agents, and knowledge graphs are intentionally outside the initial scope.
-
-## Architecture
-
-```mermaid
-flowchart TD
-    C[Course] --> L[Lecture]
-    L --> PDF[PDF slides]
-    L --> N[Personal notes]
-    L --> M[Metadata]
-    PDF --> R[Page rendering]
-    R --> VI[Visual embeddings]
-    N --> TI[Text embeddings]
-    VI --> IDX[Vector index]
-    TI --> IDX
-    Q[Natural-language query] --> QE[Query embedding]
-    QE --> IDX
-    IDX --> K[Top-K candidates]
-    K --> RR[Multimodal reranker]
-    RR --> O[Ranked slides and notes]
-```
-
-Planned core stack:
-
-- Python 3.11+
-- FastAPI, Pydantic, SQLAlchemy, and SQLite
-- Streamlit
-- PyMuPDF and Pillow
-- Qwen multimodal embeddings and reranking
-- FAISS
-- pytest and Ruff
-
-## Project Status
-
-- [x] Project packaging and repository structure
-- [x] pytest and Ruff configuration
-- [x] Import smoke test
-- [x] Application configuration
-- [x] SQLite and SQLAlchemy database foundation
-- [x] Course persistence
-- [x] Lecture persistence and Course–Lecture relationships
-- [x] Note persistence with optional slide-page references
-- [x] Slide-page persistence and validated note-page relationships
-- [x] PDF page rendering
-- [x] Idempotent PDF ingestion pipeline
-- [x] PDF text-layer extraction
-- [x] Model-independent embedding provider interface
-- [x] Qwen3-VL-Embedding-2B feasibility validation on Apple Silicon ([report](benchmark/QWEN3_VL_FEASIBILITY.md))
-- [x] Production Qwen3-VL embedding provider
-- [x] Persistent embedding cache with content-hash invalidation
-- [x] Lecture slide-page embedding pipeline with per-page failure isolation
-- [x] Lecture note-text embedding pipeline with per-note failure isolation
-- [x] Persistent FAISS vector index abstraction with entity mapping
-- [x] Unified slide and note vector retrieval
-- [x] Course and lecture search filtering
-- [x] Model-independent reranker interface
-- [x] Qwen3-VL multimodal reranker adapter
-- [x] Configured retrieval-to-rerank workflow
-- [x] Preserved embedding similarity and reranker scores
-- [x] Normalized lecture concept extraction and persistence
-- [x] Concept display data for lectures and search results
-- [x] Streamlit course home screen and course creation
-- [x] Streamlit course workspace, lecture creation, and PDF upload
-- [x] Streamlit lecture detail, slide browsing, and note editing
-- [x] Streamlit course search and ranked result screen
-- [x] Unified database-to-FAISS index build command
-- [x] Search-index freshness detection for source, model, and dimension changes
-- [x] 50-query bilingual retrieval benchmark with source-page validation
-- [x] Bilingual BM25 lexical baseline
-- [x] Recall@1/5/10 and MRR evaluation runner
-- [x] Embedding, retrieval, reranking, and total latency reporting
-
-Development is intentionally incremental. Each stage is tested before the next major capability is introduced.
+Results point back to slides and notes; the current version focuses on finding source material rather than generating answers.
 
 ## Getting Started
 
-The repository includes a runnable Streamlit home screen for creating and browsing courses.
+### Install and launch
+
+Use **Python 3.11+**. The following setup includes the local models needed for search:
 
 ```bash
 git clone https://github.com/taotaokt/LectureMemory.git
@@ -134,24 +77,19 @@ cd LectureMemory
 
 python3.11 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
-```
+python -m pip install -e '.[qwen]'
+cp .env.example .env
 
-Run the checks:
-
-```bash
-pytest
-ruff check .
-```
-
-Start the local interface:
-
-```bash
 streamlit run streamlit_app.py
 ```
 
-To explore a public synthetic course instead of importing personal material, prepare the
-idempotent demo workspace and start Streamlit against its isolated data directory:
+Open the local URL printed in your terminal.
+
+The default public models download automatically when first needed; no API key is required. Allow several minutes for the initial download and keep at least **8 GiB of free disk space** for the embedding setup. Enabling reranking downloads a second model and requires additional space and memory. Apple Silicon or a CUDA-capable GPU is recommended; CPU execution is supported but slower. After download, cached models can be reused locally.
+
+### Try the sample course
+
+To explore without uploading your own files, stop the app and run:
 
 ```bash
 python -m scripts.prepare_demo
@@ -159,296 +97,46 @@ DATA_DIR=data/demo python -m scripts.build_index
 DATA_DIR=data/demo streamlit run streamlit_app.py
 ```
 
-The demo contains three generated slides and two notes about gradient descent, learning rates,
-and L2 regularization. Building its index uses the same optional Qwen runtime as real course
-material.
+The demo includes three generated slides and two notes about gradient descent, learning rates, and L2 regularization. It uses a separate local data directory.
 
-The app initializes missing SQLite tables automatically using `DATABASE_PATH`. The home screen
-lists every course with its code and lecture count, supports creating a course, and records the
-selected course in the URL. A course workspace supports filtering and creating lectures, shows
-slide and note counts, and uploads PDFs through the validated ingestion pipeline. Uploading a PDF
-stores the source, renders its pages, and extracts its text. The course workspace can then build
-or refresh the shared search index with visible per-item progress; unchanged embeddings are
-reused. It also reports whether the index is missing, out of date, or current by comparing the
-saved model and content fingerprint with the live slides and notes. Each lecture has a detail
-workspace for browsing rendered slides,
-reviewing extracted concepts, and adding or editing general or slide-specific notes. Course
-workspaces also expose natural-language search over the persisted FAISS index. Each result shows
-its course, lecture, page, preview, text, related notes, concepts, embedding similarity, and
-reranker score. Search reports a setup message when `INDEX_DIR` does not contain a saved index.
+### Use your own materials
 
-### Optional Qwen embedding runtime
+1. Launch the app with `streamlit run streamlit_app.py`.
+2. Create a course, add a lecture, and upload its PDF.
+3. Browse the slides and add general or slide-specific notes.
+4. In the course workspace, expand **Search index** and select **Build or refresh search index**.
+5. Enter a natural-language query under **Search course memory** and review the matches. Refresh the index after changing your materials.
 
-The base installation stays lightweight. Users who want to generate embeddings should install
-the Qwen dependencies and create the local configuration with the following complete setup:
+For model settings, troubleshooting, command-line indexing, and developer setup, see the [technical guide](docs/technical-guide.md).
 
-```bash
-git clone https://github.com/taotaokt/LectureMemory.git
-cd LectureMemory
+## Evaluation
 
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev,qwen]'
-cp .env.example .env
-```
+The project includes **50 English and Chinese queries across three real course PDFs**, covering conceptual paraphrases, visual descriptions, and note-based recall. Evaluation compares keyword search (BM25), multimodal embeddings, and reranking, measuring both relevance and latency.
 
-If the base development environment is already installed, only this additional command is
-needed:
+In a local Apple Silicon reference run on September 30, 2026:
 
-```bash
-python -m pip install -e '.[qwen]'
-```
+| Search method | Recall@5 | Mean query time |
+|---|---:|---:|
+| Keyword search (BM25) | 0.540 | 0.3 ms |
+| Multimodal embeddings | 0.900 | 304.7 ms |
+| Embeddings + reranker | 0.960 | 10.5 s |
 
-No separate model-download command, model URL, or Hugging Face token is required for the default
-public model. Keep these values in `.env` unless a different device or local model directory is
-needed:
+Recall@5 measures the average fraction of labeled relevant pages found in the first five results. These results illustrate a quality–latency tradeoff: reranking improved this metric but took substantially longer, and did not improve every ranking metric.
 
-```dotenv
-DEVICE=auto
-MODEL_NAME=Qwen/Qwen3-VL-Embedding-2B
-EMBEDDING_DTYPE=auto
-EMBEDDING_DIMENSION=2048
-RERANKER_MODEL_NAME=Qwen/Qwen3-VL-Reranker-2B
-RERANKER_MAX_PIXELS=131072
-RETRIEVAL_TOP_K=20
-RERANK_TOP_K=10
-FINAL_TOP_K=5
-RERANKER_WEIGHT=0.6
-```
+This is a small, project-specific benchmark, not a claim of general performance. A later rank-fusion experiment used a different ranking setup; its full results and limitations are documented in the [technical guide](docs/technical-guide.md#retrieval-evaluation). The fusion weight was selected using this dataset and has not been validated on a separate held-out set.
 
-After importing lecture PDFs and adding notes, build or refresh the complete search index:
+See the [benchmark documentation](benchmark/README.md) for query labels and evaluation instructions. Source lecture PDFs are private and are not distributed; reproducing the real-course evaluation requires authorized copies. The synthetic demo is available to try independently.
 
-```bash
-python -m scripts.build_index
-```
+## Welcome
 
-The command embeds every persisted slide and note, reuses unchanged vectors from
-`EMBEDDING_DIR`, and atomically replaces the FAISS snapshot under `INDEX_DIR`. A full rebuild
-also removes deleted database entities from search. Individual embedding failures are reported
-without discarding successful items, and the command exits nonzero when the resulting snapshot
-is partial. Progress is printed per entity, and cache metadata is checkpointed every 10 entities
-so an interrupted run can resume without recomputing completed vectors. A running Streamlit app
-detects the replaced snapshot on the next search.
+Students, researchers, and developers are welcome to explore Lecture Memory and try it with their own study materials.
 
-Installing this optional runtime and downloading the default model require significant disk
-space:
+- **Share feedback:** [open an issue](https://github.com/taotaokt/LectureMemory/issues) with a usability suggestion or a search example that did not work as expected.
+- **Discuss research ideas:** suggest retrieval comparisons, evaluation improvements, or ways to support visual learning materials.
+- **Contribute improvements:** propose a change in an issue or pull request. See the [technical guide](docs/technical-guide.md) and [project specification](PROJECT_SPEC.md) for implementation context.
 
-- `Qwen/Qwen3-VL-Embedding-2B` model weights occupy approximately **4 GiB**;
-- the Python model runtime and its dependencies may occupy approximately **1 GiB**;
-- keep at least **8 GiB of free disk space** available for the installation, download,
-  temporary files, and cache overhead.
+When sharing examples, use synthetic content or material you have permission to publish.
 
-The model weights are **not bundled with this repository**. The provider loads PyTorch lazily
-and automatically downloads the model from Hugging Face on the first embedding inference. The
-first indexing or search operation can therefore take several minutes, depending on the network
-connection, before inference begins. A network connection is required for this initial download;
-after it completes, later runs reuse the cached files automatically.
+## License
 
-By default, Hugging Face stores the downloaded model in its shared user cache (commonly
-`~/.cache/huggingface/hub`) rather than under this repository. Set `HF_HOME` to choose a
-different cache location, or set `MODEL_NAME` to an already-downloaded local model directory for
-offline use. Model weights and Hugging Face caches are ignored by Git.
-
-If the automatic download fails, check that the machine has at least 8 GiB of free space, can
-reach Hugging Face, and has permission to write to the configured cache directory, then retry.
-An interrupted Hugging Face download can normally resume rather than restarting from zero.
-
-With `DEVICE=auto`, the provider selects CUDA first, Apple MPS second, and CPU as a fallback.
-CPU mode is supported, but embedding a large slide collection can be substantially slower;
-Apple Silicon or a CUDA-capable GPU is recommended.
-
-```python
-from app.config import get_settings
-from app.embeddings import Qwen3VLEmbeddingProvider
-
-settings = get_settings()
-provider = Qwen3VLEmbeddingProvider(
-    model_name=settings.model_name,
-    device=settings.device,
-    dtype=settings.embedding_dtype,
-    dimension=settings.embedding_dimension,
-    batch_size=settings.embedding_batch_size,
-    max_pixels=settings.embedding_max_pixels,
-    query_instruction=settings.embedding_query_instruction,
-)
-
-query_vector = provider.embed_query("Where did we discuss convex sets?")
-slide_vector = provider.embed_image("data/rendered/course-1/lecture-3/page-001.png")
-similarity = float(query_vector @ slide_vector)
-```
-
-Embedding vectors are stored as atomic `.npy` files under `EMBEDDING_DIR`, while SQLite keeps
-the entity type and ID, model name, vector dimension, relative file path, content hash, and
-creation time. Unchanged content reuses its vector; changed, missing, or corrupt entries are
-recomputed safely. `embed_lecture_slides` and `embed_lecture_notes` process all persisted content
-for one lecture, report generated, cached, and failed item counts, and isolate individual failures
-so the remaining slides or notes can still be indexed.
-
-`FaissVectorIndex` provides exact cosine-similarity search without exposing FAISS objects to the
-rest of the application. It supports building and incrementally adding mixed slide-page and note
-vectors, mapping matches back to domain entities, and saving or loading validated index snapshots
-under `INDEX_DIR`.
-
-`search_lecture_memory` embeds a natural-language query, searches the shared vector index, and
-returns normalized `SearchResult` objects for both slides and notes. Results include course and
-lecture context, optional page and preview information, text previews, related slide notes, and
-the raw similarity score without exposing FAISS or database models to the frontend. Optional
-`course_id` and `lecture_id` filters restrict the candidate scope before the final `top_k` results
-are returned.
-
-The `Reranker` abstraction accepts a query and normalized search candidates, validates one score
-per candidate, applies stable score ordering, and returns immutable results with updated ranks and
-`reranker_score` values. The original `raw_similarity` remains available for evaluation.
-
-`Qwen3VLReranker` implements that interface with lazy model loading and CUDA, Apple MPS, or CPU
-execution. Slide candidates use the rendered image together with extracted text when available;
-note candidates are reranked as text. The optional `qwen` dependency group provides its runtime.
-
-`search_and_rerank` connects the complete query path. By default it retrieves 20 vector-search
-candidates, sends up to 10 candidates to the reranker, fuses the embedding and reranker ranks
-with a 40/60 weighted reciprocal-rank score, and returns the best 5. Rank fusion avoids assuming
-that cosine similarities and reranker probabilities share a directly comparable scale. Course and lecture
-filters are applied before reranking, empty indexes avoid loading either model, and configuration
-requires `FINAL_TOP_K <= RERANK_TOP_K <= RETRIEVAL_TOP_K`.
-
-The course workspace exposes fast and reranked search per query. Fast search keeps the multimodal
-embedding retrieval but sets the reranker contribution to zero, so the reranker model is never
-loaded or called. Reranked search uses the configured rank fusion when the extra latency is worth
-the measured quality gain.
-
-```python
-from app.config import get_settings
-from app.retrieval import Qwen3VLReranker, search_and_rerank
-
-settings = get_settings()
-reranker = Qwen3VLReranker(
-    model_name=settings.reranker_model_name,
-    device=settings.device,
-    dtype=settings.reranker_dtype,
-    batch_size=settings.reranker_batch_size,
-    max_length=settings.reranker_max_length,
-    min_pixels=settings.reranker_min_pixels,
-    max_pixels=settings.reranker_max_pixels,
-    instruction=settings.reranker_instruction,
-)
-
-results = search_and_rerank(
-    session,
-    "Where did we discuss convex sets?",
-    provider=provider,
-    index=index,
-    reranker=reranker,
-    retrieval_top_k=settings.retrieval_top_k,
-    rerank_top_k=settings.rerank_top_k,
-    final_top_k=settings.final_top_k,
-    reranker_weight=settings.reranker_weight,
-)
-```
-
-`RuleBasedConceptExtractor` provides a lightweight initial concept extractor without requiring
-another model download. It combines the lecture title, extracted slide text, and personal notes;
-normalizes concept names for deduplication; and stores confidence-scored `auto_extracted`
-associations. Re-extraction replaces earlier automatic associations while retaining concepts
-added with the `manual` source. The extractor is intentionally replaceable so a future model-based
-implementation can use the same persistence workflow.
-
-```python
-from app.concepts import RuleBasedConceptExtractor
-from app.services.concept_service import extract_lecture_concepts
-
-summary = extract_lecture_concepts(
-    session,
-    lecture_id,
-    extractor=RuleBasedConceptExtractor(max_concepts=12),
-)
-```
-
-`get_lecture_concept_display` returns ordered, serializable concept metadata for a lecture.
-Unified slide and note `SearchResult` objects also include the lecture's ordered concept names,
-and reranking preserves that display metadata together with both relevance scores. Streamlit can
-consume these objects directly without accessing database associations.
-
-## Retrieval Evaluation
-
-Retrieval quality is measured rather than inferred from demonstrations. The first dataset contains
-50 English and Chinese student-style queries across semantic, visual, and note-oriented recall.
-Its schema, source PDFs, and page ranges can be validated locally:
-
-```bash
-python -m scripts.validate_benchmark
-```
-
-Prepare or resume the local benchmark database from the authorized PDFs, then build its index:
-
-```bash
-python -m scripts.prepare_benchmark
-python -m scripts.build_index
-```
-
-See [benchmark/README.md](benchmark/README.md) for the annotation contract. The evaluation runner
-requires the benchmark lectures to be ingested into the configured database. Run only the
-lightweight lexical baseline with:
-
-```bash
-python -m scripts.evaluate --methods bm25
-```
-
-After generating the persisted multimodal index, run the complete comparison with:
-
-```bash
-python -m scripts.build_index
-python -m scripts.evaluate
-```
-
-The runner reports:
-
-- Recall@1, Recall@5, and Recall@10;
-- Mean Reciprocal Rank (MRR);
-- embedding, retrieval, reranking, and total query latency;
-- comparisons between BM25, multimodal embeddings, and embeddings with reranking.
-
-Detailed per-query JSON and summary CSV files are written under `benchmark/results/`. Results
-map both slide hits and page-attached note hits back to stable lecture/page labels, deduplicate
-repeated page matches, and measure Recall@K as the average fraction of labeled relevant pages
-retrieved within K. Generated reports remain local because benchmark source lectures are private.
-
-A local Apple MPS reference run on September 30, 2026 produced the following page-level
-results over all 50 queries. The reranker used `batch_size=1` and `max_pixels=131072` because
-the current Transformers/MPS multi-image batch path produced non-finite float16 scores:
-
-| Method | R@1 | R@5 | R@10 | MRR | Mean total latency |
-|---|---:|---:|---:|---:|---:|
-| BM25 | 0.360 | 0.540 | 0.600 | 0.419 | 0.3 ms |
-| Qwen Embedding | 0.740 | 0.900 | 1.000 | 0.816 | 304.7 ms |
-| Qwen + Reranker | 0.720 | 0.960 | 0.980 | 0.801 | 10,515.9 ms |
-
-The pure reranker improved Recall@5 but reduced R@1 and MRR on this first dataset. A post-hoc
-weighted reciprocal-rank analysis selected a 0.6 reranker weight. A clean database and index
-rebuild on October 1, 2026 then measured the fused entity-level pipeline with 116 slide pages,
-`retrieval_top_k=20`, `rerank_top_k=10`, and a 131,072-pixel reranker budget:
-
-| Method | R@1 | R@5 | R@10 | MRR | Mean total latency |
-|---|---:|---:|---:|---:|---:|
-| Qwen Embedding | 0.700 | 0.880 | 0.980 | 0.791 | 576.5 ms |
-| Qwen + Rank Fusion | 0.740 | 0.920 | 0.980 | 0.818 | 17,282.2 ms |
-
-The fused ranking improved R@1 by 0.04, R@5 by 0.04, and MRR by 0.027 while preserving R@10
-within the same run. The weight remains configurable rather than hard-coded. The 131,072-pixel
-default is a deliberate Apple Silicon latency tradeoff; larger image budgets can be selected for
-separate quality experiments.
-
-Private or copyrighted lecture materials will not be committed to the repository.
-
-## Repository Layout
-
-```text
-app/          Application, ingestion, embedding, and retrieval packages
-frontend/     Streamlit pages and components
-benchmark/    Retrieval datasets, metrics, and experiment results
-scripts/      Ingestion, indexing, and evaluation entry points
-tests/        Automated tests
-data/         Local source files and generated artifacts (Git-ignored)
-```
-
-The detailed product specification and implementation plan are available in [PROJECT_SPEC.md](PROJECT_SPEC.md).
+This repository does not currently include a license file. No open-source license has been granted for reuse, modification, or redistribution. Third-party libraries and model weights remain subject to their respective licenses.
